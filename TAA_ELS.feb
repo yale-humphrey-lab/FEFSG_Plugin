@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<febio_spec version="3.0">
+    <Module type="solid"/>
+	<Control>
+		<analysis>STATIC</analysis>
+		<time_steps>100</time_steps>
+		<step_size>1</step_size>
+		<solver>
+			<diverge_reform>1</diverge_reform>
+			<reform_each_time_step>1</reform_each_time_step>
+	        <dtol>0</dtol>
+	        <etol>1e-16</etol>
+	        <rtol>1e-16</rtol>
+			<lstol>0.0</lstol>
+			<min_residual>1e-20</min_residual>
+            <qn_method type="Broyden"/>
+                <max_refs>1000</max_refs>
+                <max_ups>0</max_ups>
+            <symmetric_stiffness>0</symmetric_stiffness>
+		</solver>
+	</Control>
+    <Globals>
+        <Constants>
+            <T>0</T>
+            <R>0</R>
+            <Fc>0</Fc>
+        </Constants>
+    </Globals>
+    <Material>
+        <material id="1" name="Material1" type="FSG">
+            <density>1</density>
+        </material>
+    </Material>
+	<Geometry>
+		<Nodes name="Object01">
+			<node id="1">-6.87e-01, 0, -3.235e-02</node>
+			<node id="2">-6.87e-01, 0, 3.235e-02</node>
+			<node id="3">-6.47e-01, 0, -3.235e-02</node>
+			<node id="4">-6.47e-01, 0, 3.235e-02</node>
+			<node id="5">0, -6.87e-01, -3.235e-02</node>
+			<node id="6">0, -6.87e-01, 3.235e-02</node>
+			<node id="7">0, -6.47e-01, -3.235e-02</node>
+			<node id="8">0, -6.47e-01, 3.235e-02</node>
+			<node id="9">0, 6.47e-01, -3.235e-02</node>
+			<node id="10">0, 6.47e-01, 3.235e-02</node>
+			<node id="11">0, 6.87e-01, -3.235e-02</node>
+			<node id="12">0, 6.87e-01, 3.235e-02</node>
+			<node id="13">6.47e-01, 0, -3.235e-02</node>
+			<node id="14">6.47e-01, 0, 3.235e-02</node>
+			<node id="15">6.87e-01, 0, -3.235e-02</node>
+			<node id="16">6.87e-01, 0, 3.235e-02</node>
+		</Nodes>
+		<Elements type="hex8" mat="1" name="Part1">
+			<elem id="1">13, 15, 11, 9, 14, 16, 12, 10</elem>
+			<elem id="2">9, 11, 1, 3, 10, 12, 2, 4</elem>
+			<elem id="3">3, 1, 5, 7, 4, 2, 6, 8</elem>
+			<elem id="4">7, 5, 15, 13, 8, 6, 16, 14</elem>
+		</Elements>
+		<NodeSet name="FixedDisplacement1">
+			<node id="3"/>
+			<node id="4"/>
+			<node id="13"/>
+			<node id="14"/>
+		</NodeSet>
+		<NodeSet name="FixedDisplacement2">
+			<node id="7"/>
+			<node id="8"/>
+			<node id="9"/>
+			<node id="10"/>
+		</NodeSet>
+		<NodeSet name="FixedDisplacement3">
+			<node id="1"/>
+			<node id="2"/>
+			<node id="3"/>
+			<node id="4"/>
+		</NodeSet>
+		<NodeSet name="Nodeset01">
+			<n id="1"/>
+			<n id="2"/>
+			<n id="3"/>
+			<n id="4"/>
+			<n id="5"/>
+			<n id="6"/>
+			<n id="7"/>
+			<n id="8"/>
+			<n id="9"/>
+			<n id="10"/>
+			<n id="11"/>
+			<n id="12"/>
+			<n id="13"/>
+			<n id="14"/>
+			<n id="15"/>
+			<n id="16"/>
+		</NodeSet>
+		<Surface name="PressureLoad1">
+			<quad4 id="1">     3,     4,  8,  7</quad4>
+			<quad4 id="2">    7,     8,  14,  13</quad4>
+			<quad4 id="3">    13,    14,  10,  9</quad4>
+			<quad4 id="4">    9,    10,  4,  3</quad4>
+		</Surface>
+	</Geometry>
+
+	<Boundary>
+		<bc name="Nodeset01" type="fix" node_set="Nodeset01">
+			<dofs>z</dofs>
+		</bc>
+		<bc name="FixedDisplacement1" type="fix" node_set="FixedDisplacement1">
+			<dofs>y</dofs>
+		</bc>
+		<bc name="FixedDisplacement2" type="fix" node_set="FixedDisplacement2">
+			<dofs>x</dofs>
+		</bc>
+	</Boundary>
+	<MeshData>
+		 <ElementData var="mat_axis" elem_set="Part1"> 
+			<elem lid="1">
+				<a>0.707107, 0.707107, 0</a>
+				<d>-0.707107, 0.707107, 0</d>
+			</elem>
+			<elem lid="2">
+				<a>-0.707107, 0.707107, 0</a>
+				<d>-0.707107, -0.707107, 0</d>
+			</elem>
+			<elem lid="3">
+				<a>-0.707107, -0.707107, 0</a>
+				<d>0.707107, -0.707107, 0</d>
+			</elem>
+			<elem lid="4">
+				<a>0.707107, -0.707107, 0</a>
+				<d>0.707107, 0.707107, 0</d>
+			</elem>
+		</ElementData>
+	</MeshData>
+    <Loads>
+        <surface_load type="pressure" surface="PressureLoad1">
+            <pressure lc="1">13.9868</pressure>
+            <linear>0</linear>
+<!--
+            <pressure_stiffness>1</pressure_stiffness>
+            <symmetric_stiffness>0</symmetric_stiffness>
+-->
+        </surface_load>
+    </Loads>
+
+	<LoadData>
+		<load_controller id="1" type="loadcurve">
+			<interpolate>LINEAR</interpolate>
+			<points>
+				<point>0,1</point>
+				<point>10,1</point>
+			</points>
+		</load_controller>
+	</LoadData>
+    <Output>
+        <plotfile type="vtk">
+            <var type="displacement"/>
+            <var type="relative volume"/>
+            <var type="stress"/>
+			<var type="SPR stress"/>
+			<var type="Lagrange strain"/>
+			<var type="SPR principal stress"/>
+            <var type="strain energy density"/>
+            <var type="acceleration"/>
+			<var type="velocity"/>
+        </plotfile>
+    </Output>
+</febio_spec>

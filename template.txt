@@ -1,0 +1,12 @@
+# GRMaterialPoint Data File             
+rho_hat_h bar_tauw_h sigma_inv_h K_delta_tauw K_delta_sigma k_act lambda_0 lambda_m CB CS T_act       
+1050 10000 468603 0 0 0.0143 0.7 1.2 1 0 0       
+                
+# Constituent Data              
+m_degradable m_inflammatory m_active m_polymer c1_alpha_h c2_alpha_h eta_alpha_h g_alpha_h g_alpha_r g_alpha_theta g_alpha_z phi_alpha k_alpha_h K_tauw_p_alpha_h K_sigma_p_alpha_h K_tauw_d_alpha_h K_sigma_d_alpha_h
+0 0 0 0 89710 0 -1 -1 0.3248 1.9 1.62 0.34 0 0 0 0 0
+1 0 1 0 261400 0.24 90 1.2 -1 -1 -1 0.33 0.142 0 1 0 0
+1 0 0 0 234900 4.08 90 1.2 -1 -1 -1 0.01848 0.142 0 1 0 0
+1 0 0 0 234900 4.08 0 1.2 -1 -1 -1 0.02211 0.142 0 1 0 0
+1 0 0 0 234900 4.08 29.9 1.2 -1 -1 -1 0.144705 0.142 0 1 0 0
+1 0 0 0 234900 4.08 330.1 1.2 -1 -1 -1 0.144705 0.142 0 1 0 0
