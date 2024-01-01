@@ -186,7 +186,7 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 	// get current and end times
 	const double t = GetFEModel()->GetTime().currentTime;
 	//TODO: Get and set dt better time step?
-	const double dt = 0.1;
+	const double dt = 0.25;
 	const int sn = int(t/dt);
 
 	mat3d Q = GetLocalCS(mp);
@@ -211,11 +211,21 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
     pt.sigma_inv_curr = stress.tr();
 
 
+    /*
+
     printf("J: %f\n", J);
     printf("J_s: %f\n", J_s);
-    printf("stress.tr(): %f\n", stress.tr());
     printf("p_val: %f\n", p_val);
-    printf("pp_val: %f\n", UJJ(J, J_s));
+    printf("sigma_inv_curr: %f\n", pt.sigma_inv_curr);
+    fflush(stdout);
+
+    printf("Q:\n");
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            printf("%f ", Q(i, j));
+        }
+        printf("\n");
+    }
     fflush(stdout);
 
     printf("F:\n");
@@ -226,8 +236,6 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
         printf("\n");
     }
     fflush(stdout);
-
-    /*
 
     printf("Fbar:\n");
     for (int i = 0; i < 3; ++i) {

@@ -34,7 +34,7 @@
         </material>
     </Material>
 
-	<Geometry>
+	<Mesh>
 		<Nodes name="Object01">
 			<node id="1"> 6.4680000e-001, 0.0000000e+000, 0.0000000e+000</node>
 			<node id="2"> 6.5685000e-001, 0.0000000e+000, 0.0000000e+000</node>
@@ -5055,7 +5055,13 @@
 			<quad4 id="199">   996,   991,  1991,  1996</quad4>
 			<quad4 id="200">     1,   996,  1996,  1001</quad4>
 		</Surface>
-	</Geometry>
+	</Mesh>
+
+	<MeshDomains>
+		<SolidDomain name="Part1" mat="Material1">
+		</SolidDomain>
+	</MeshDomains>
+
 	<Boundary>
         <bc name="FixedDisplacement1" type="fix" node_set="FixedDisplacement1">
             <dofs>x</dofs>
@@ -8270,7 +8276,6 @@
 			<d>-0.003927, 0.999992, 0</d>
 		</elem>
 	</ElementData>
-
 	</MeshData>
     <Loads>
         <surface_load type="pressure" surface="PressureLoad1">
@@ -8279,7 +8284,6 @@
             <symmetric_stiffness>0</symmetric_stiffness>
         </surface_load>
     </Loads>
-
 	<LoadData>
 		<load_controller id="1" type="loadcurve">
 			<interpolate>LINEAR</interpolate>
