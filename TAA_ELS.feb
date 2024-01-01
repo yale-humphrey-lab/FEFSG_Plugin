@@ -3,7 +3,7 @@
     <Module type="solid"/>
 	<Control>
 		<analysis>STATIC</analysis>
-		<time_steps>100</time_steps>
+		<time_steps>10</time_steps>
 		<step_size>1</step_size>
 		<solver>
 			<diverge_reform>1</diverge_reform>
@@ -29,6 +29,7 @@
     <Material>
         <material id="1" name="Material1" type="FSG">
             <density>1</density>
+		 	<k>100000.0</k>
         </material>
     </Material>
 	<Geometry>
@@ -61,12 +62,20 @@
 			<node id="4"/>
 			<node id="13"/>
 			<node id="14"/>
+			<node id="1"/>
+			<node id="2"/>
+			<node id="15"/>
+			<node id="16"/>
 		</NodeSet>
 		<NodeSet name="FixedDisplacement2">
+			<node id="5"/>
+			<node id="6"/>
 			<node id="7"/>
 			<node id="8"/>
 			<node id="9"/>
 			<node id="10"/>
+			<node id="11"/>
+			<node id="12"/>
 		</NodeSet>
 		<NodeSet name="FixedDisplacement3">
 			<node id="1"/>
@@ -99,7 +108,6 @@
 			<quad4 id="4">    9,    10,  4,  3</quad4>
 		</Surface>
 	</Geometry>
-
 	<Boundary>
 		<bc name="Nodeset01" type="fix" node_set="Nodeset01">
 			<dofs>z</dofs>
@@ -135,13 +143,9 @@
         <surface_load type="pressure" surface="PressureLoad1">
             <pressure lc="1">13.9868</pressure>
             <linear>0</linear>
-<!--
-            <pressure_stiffness>1</pressure_stiffness>
             <symmetric_stiffness>0</symmetric_stiffness>
--->
         </surface_load>
     </Loads>
-
 	<LoadData>
 		<load_controller id="1" type="loadcurve">
 			<interpolate>LINEAR</interpolate>

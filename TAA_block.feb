@@ -10,10 +10,10 @@
 			<max_ups>10</max_ups>
 			<diverge_reform>1</diverge_reform>
 			<reform_each_time_step>1</reform_each_time_step>
-			<dtol>0.001</dtol>
-			<etol>0.01</etol>
-			<rtol>0</rtol>
-			<lstol>0.9</lstol>
+	        <dtol>0</dtol>
+	        <etol>1e-16</etol>
+	        <rtol>1e-16</rtol>
+			<lstol>0.0</lstol>
 			<min_residual>1e-20</min_residual>
 			<qnmethod>BFGS</qnmethod>
 			<rhoi>-2</rhoi>
@@ -28,7 +28,8 @@
     </Globals>
     <Material>
         <material id="1" name="Material1" type="FSG">
-			<density>1</density>
+            <density>1</density>
+            <k>10000.0</k>
         </material>
     </Material>
 	<Geometry>
@@ -45,45 +46,41 @@
 		<Elements type="hex8" mat="1" name="Part1">
 			<elem id="1">1,5,7,3,2,6,8,4</elem>
 		</Elements>
-		<NodeSet name="Nodeset01">
-			<n id="1"/>
-			<n id="3"/>
-			<n id="7"/>
-			<n id="5"/>
-		</NodeSet>
-		<NodeSet name="Nodeset02">
-			<n id="1"/>
-		</NodeSet>
-		<NodeSet name="Nodeset03">
-			<n id="1"/>
-		</NodeSet>
+		<Surface name="Fix_Zs">
+			<quad4 id="1">1,3,7,5</quad4>
+		</Surface>
+		<Surface name="Fix_Ys">
+			<quad4 id="1">1,5,6,2</quad4>
+		</Surface>
+		<Surface name="Fix_Xs">
+			<quad4 id="1">3,1,2,4</quad4>
+		</Surface>
 		<Surface name="PressureLoad1">
 			<quad4 id="1">2,6,8,4</quad4>
 		</Surface>
 	</Geometry>
 	<Boundary>
-		<bc name="Nodeset01" type="fix" node_set="Nodeset01">
+		<bc name="Fix_Zs" type="fix" node_set="@surface:Fix_Zs">
 			<dofs>z</dofs>
 		</bc>
-		<bc name="Nodeset02" type="fix" node_set="Nodeset01">
+		<bc name="Fix_Ys" type="fix" node_set="@surface:Fix_Ys">
 			<dofs>y</dofs>
 		</bc>
-		<bc name="Nodeset03" type="fix" node_set="Nodeset01">
+		<bc name="Fix_Xs" type="fix" node_set="@surface:Fix_Xs">
 			<dofs>x</dofs>
 		</bc>
 	</Boundary>
 	<MeshData>
 		 <ElementData var="mat_axis" elem_set="Part1"> 
 			<elem lid="1">
-				<a>1, 0, 0</a>
+				<a>0, 0, 1</a>
 				<d>0, 1, 0</d>
 			</elem>
 		</ElementData>
 	</MeshData>
     <Loads>
         <surface_load type="pressure" surface="PressureLoad1">
-            <pressure lc="1">100.0</pressure>
-            <linear>0</linear>
+            <pressure lc="1">1000.0</pressure>
         </surface_load>
     </Loads>
 

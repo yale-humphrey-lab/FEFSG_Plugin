@@ -133,6 +133,20 @@ public:
 	        hat_S_alpha =  c1_alpha_h * Q1 * exp(Q2);
 	        hat_dS_dlambda2_alpha =  c1_alpha_h * exp(Q2) * (1 + 2 * Q2);
 
+	        /*
+			printf("sn: %d\n", sn);
+			printf("ts: %d\n", ts);
+			printf("g_alpha_h: %f\n", g_alpha_h);
+			printf("lambda_alpha_tau[sn]: %f\n", lambda_alpha_tau[sn]);
+			printf("lambda_alpha_tau[ts]: %f\n", lambda_alpha_tau[ts]);
+			printf("lambda_alpha_ntau_s: %f\n", lambda_alpha_ntau_s);
+			printf("Q1: %f\n", Q1);
+			printf("Q2: %f\n", Q2);
+			printf("hat_S_alpha: %f\n", hat_S_alpha);
+			printf("hat_dS_dlambda2_alpha: %f\n", hat_dS_dlambda2_alpha);
+			fflush(stdout);
+			*/
+
 	    }
 	    else {
 
@@ -176,7 +190,6 @@ public:
 public:
     int nts;
     int sn;
-    double dt;
     double K_delta_tauw;
     double K_delta_sigma;
     double sigma_inv_h;
@@ -249,6 +262,8 @@ public:
 	// which is a fourth-order tensor with major and minor symmetries.
 	virtual tens4ds Tangent(FEMaterialPoint& pt) override {
 		tens4ds tangent;
+		printf("!!!!!!!!!!!!!!!!!!!!Using TANGENT \n");
+		fflush(stdout);
 		return tangent;
 	};
 
@@ -259,6 +274,46 @@ public:
 		StressTangent(pt, stress, tangent);
 		return tangent;
 	}
+
+public:
+    // TODO: removing virtual from the following 3 functions causes changes
+    // to the convergence criteria on macOS, despite these functions not
+    // being overridden anywhere.
+	//! strain energy density U(J)
+    virtual double U(double J, double J_tar) {
+        switch (m_npmodel) {
+            case 0: return 0.5*m_K*pow(log(J/J_tar),2); break;    // FEBio default
+            case 1: return 0.25*m_K*(J/J_tar*J/J_tar - 2.0*log(J/J_tar) - 1.0); break;    // NIKE3D's Ogden material
+            case 2: return 0.5*m_K*(J/J_tar-1)*(J/J_tar-1); break;      // ABAQUS
+            case 3: return 0.5*m_K*((J/J_tar*J/J_tar-1)/2-log(J/J_tar)); break;      // ABAQUS - GOH
+            default: { assert(false); return 0; }
+        }
+    }
+	//! pressure, i.e. first derivative of U(J)
+	virtual double UJ(double J, double J_tar) {
+        switch (m_npmodel) {
+            case 0: return m_K*log(J/J_tar)/J; break;
+            case 1: return 0.5*m_K*(J/(J_tar*J_tar) - 1.0/J); break;
+            case 2: return m_K*(J/J_tar-1); break;
+            case 3: return 0.5*m_K*(J/(J_tar*J_tar)-1.0/J); break;
+			default: { assert(false); return 0; }
+		}
+    }
+
+	//! second derivative of U(J) 
+	virtual double UJJ(double J, double J_tar) {
+        switch (m_npmodel) {
+            case 0: return m_K*(1-log(J/J_tar))/(J*J); break;
+            case 1: return 0.5*m_K*(1/(J_tar*J_tar) + 1.0/(J*J)); break;
+            case 2: return m_K/J_tar; break;
+            case 3: return 0.5*m_K*(1/(J_tar*J_tar) + 1.0/(J*J)); break;
+			default: { assert(false); return 0; }
+		}
+    }
+
+public:
+	double	m_K;			//!< bulk modulus
+	int     m_npmodel;      //!< pressure model for U(J)
 
     DECLARE_FECORE_CLASS();
 

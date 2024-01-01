@@ -16,13 +16,16 @@
 
 // define the material parameters
 BEGIN_FECORE_CLASS(FEFSG, FEElasticMaterial)
-    ADD_PARAMETER(m_secant_tangent, "secant_tangent");
+    ADD_PARAMETER(m_K      , FE_RANGE_GREATER_OR_EQUAL(0.0), "k")->setUnits(UNIT_PRESSURE)->MakeTopLevel(true)->setLongName("bulk modulus");
+    ADD_PARAMETER(m_npmodel, "pressure_model")->setEnums("default\0NIKE3D\0Abaqus\0Abaqus (GOH)\0")->MakeTopLevel(true);
 END_FECORE_CLASS();
 
 // define the material parameters
 FEFSG::FEFSG(FEModel* pfem) : FEElasticMaterial(pfem)
 {
-    m_secant_tangent = true;
+    m_K = 0;    // invalid value!
+    m_npmodel = 2;
+    m_secant_tangent = 1;
 }
 
 FEMaterialPointData* GRMaterialPoint::Copy()
@@ -38,7 +41,6 @@ void GRMaterialPoint::Init()
 
 	nts = 720;
     sn = 0;
-    dt = 0.0;
     K_delta_tauw = 0.0;
     K_delta_sigma = 0.0;
     sigma_inv_h = 0.0;
@@ -112,7 +114,7 @@ void GRMaterialPoint::Init()
 	    constituent.rhoR_alpha_h = constituent.phi_alpha * rho_hat_h;
 
 	    if (constituent.eta_alpha_h >= 0) { //for anisotropic constituents
-	        constituent.G_alpha_h = mat3dd(0.0, sin(constituent.eta_alpha_h), cos(constituent.eta_alpha_h));
+	        constituent.G_alpha_h = constituent.g_alpha_h * mat3dd(0.0, sin(constituent.eta_alpha_h), cos(constituent.eta_alpha_h));
 	    }
 	    else { //for isotropic constituents (i.e. elastin)
 	        constituent.G_alpha_h = mat3dd(constituent.g_alpha_r, constituent.g_alpha_theta, constituent.g_alpha_z);
@@ -138,7 +140,6 @@ void GRMaterialPoint::Serialize(DumpStream& ar)
 
     ar & nts;
     ar & sn;
-    ar & dt;
     ar & K_delta_sigma;
     ar & sigma_inv_h;
     ar & sigma_inv_curr;
@@ -185,7 +186,7 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 	// get current and end times
 	const double t = GetFEModel()->GetTime().currentTime;
 	//TODO: Get and set dt better time step?
-	const double dt = 1.0;
+	const double dt = 0.1;
 	const int sn = int(t/dt);
 
 	mat3d Q = GetLocalCS(mp);
@@ -199,17 +200,91 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 
 	pt.update_sigma(dt, sn);
 
-    //TODO: set/get bulk modulus
-    double Kp = 1000.0;
-    // Dilational volumetric penalty term
-	double p  = Kp*(J/J_s - 1.0);
-	double pl = Kp*(2.0*J/J_s - 1.0);
+    // DEFINITELY THIS IS PUSH-FORWARD TO Q
+	mat3ds sbar = (J_s / J) * (Q * pt.m_sigma * Q.transpose()).sym();
 
-	mat3ds stress_bar = (J_s / J)*(Q * pt.m_sigma * Q.transpose()).sym();
+    // calculate the stress as a sum of deviatoric stress and pressure
+    double p_val = UJ(J, J_s);
 
-	stress = (mat3dd(1.0) * p) + stress_bar.dev();
+    stress = mat3dd(p_val) + sbar.dev();
 
-	pt.sigma_inv_curr = stress.tr();
+    pt.sigma_inv_curr = stress.tr();
+
+
+    printf("J: %f\n", J);
+    printf("J_s: %f\n", J_s);
+    printf("stress.tr(): %f\n", stress.tr());
+    printf("p_val: %f\n", p_val);
+    printf("pp_val: %f\n", UJJ(J, J_s));
+    fflush(stdout);
+
+    printf("F:\n");
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            printf("%f ", F(i, j));
+        }
+        printf("\n");
+    }
+    fflush(stdout);
+
+    /*
+
+    printf("Fbar:\n");
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            printf("%f ", Fbar(i, j));
+        }
+        printf("\n");
+    }
+    fflush(stdout);
+
+    printf("pt.m_F_s[sn]:\n");
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            printf("%f ", pt.m_F_s[sn](i, j));
+        }
+        printf("\n");
+    }
+    fflush(stdout);
+
+    printf("pt.m_sigma:\n");
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            printf("%f ", pt.m_sigma(i, j));
+        }
+        printf("\n");
+    }
+    fflush(stdout);
+
+    printf("sbar:\n");
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            printf("%f ", sbar(i, j));
+        }
+        printf("\n");
+    }
+    fflush(stdout);
+
+    printf("stress:\n");
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            printf("%f ", stress(i, j));
+        }
+        printf("\n");
+    }
+    fflush(stdout);
+
+    printf("pt.m_CC:\n");
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            printf("%f ", pt.m_CC(i, j, 1, 1));
+        }
+        printf("\n");
+    }
+    fflush(stdout);
+
+    fflush(stdout);
+    */
 
 	const mat3dd  I(1.0);
 	const tens4ds IxI = dyad1s(I);
@@ -217,22 +292,23 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 	const tens4dmm IxIss = tens4dmm(IxI);							// IxI in tens4dmm form
 	const tens4dmm IoIss = tens4dmm(IoI);							// IoI in tens4dmm form
 
-	mat3ds  siso = stress_bar.dev();
-	tens4ds sisoxI = dyad1s(siso, I);
-	tens4dmm sisoxIss = tens4dmm(sisoxI);
+    tens4dmm cbar = (J_s / J) * pt.m_CC.pp(Q);
 
+    tens4dmm dev_tangent = cbar - 1./3.*((ddot(cbar, IxIss) + ddot(IxIss, cbar)) - IxIss*(cbar.tr()/3.))
+    + 2./3.*((IoIss-IxIss/3.)*sbar.tr()-tens4dmm(dyad1s(sbar.dev(),I)));
 
-	tens4dmm proj = IoIss - (1.0 / 3.0)*IxIss;
-
-	tens4dmm cbarJi = (J_s / J)*pt.m_CC.pp(Q);
-
-	tens4dmm proj_cbarJi_proj = cbarJi - (1.0 / 3.0)*ddot(cbarJi, IxI) + (1.0 / 9.0)*IxI*cbarJi.tr();
-
-	tens4dmm tangent_iso =  tens4dmm(proj_cbarJi_proj) + (((2.0 / 3.0)*stress_bar.tr())*proj - (2.0 / 3.0)*sisoxIss);
-
-	// TODO: Finish adding penalty tangent and CHECK Q push/pull
-	tangent = tangent_iso + pl * IxIss + 2 * p * IoIss;
-
+    // tangent is sum of three terms
+    // C = c_tilde + c_pressure + c_k
+    //
+    // + c_tilde is the derivative of the deviatoric stress with respect to C
+    // + c_pressure is p*d(JC)/dC
+    // + c_k comes from the derivative of p with respect to C
+    // 
+    // Note that the c_k term is not necessary in the 3F formulation (since p is independant variable) 
+    // but we do need to add it here.
+    //
+    //        c_tilde         c_pressure            c_k
+    tangent = dev_tangent + (IxIss - IoIss*2)*p_val + IxIss*(UJJ(J, J_s)*J);
 
 
 }
@@ -381,10 +457,9 @@ void GRMaterialPoint::update_sigma(double dt, int sn) {
     //Get current time index
     int taun_min = 0;
 
-	mat3dd  I(1.0);
-    //TODO: Check dyad1s(I) everywhere (vs dyad4s(I))
-	tens4ds IxI = dyad1s(I);
-	tens4dmm IxIss = tens4dmm(IxI);							// IxI in tens4dmm form
+    mat3ds  full1(1.0,1.0,1.0,1.0,1.0,1.0);
+    tens4ds full11 = dyad1s(full1);
+    tens4dmm full11ss = tens4dmm(full11);                     // full11 in tens4dmm form
 
     //Find the current deformation gradient
     mat3d F_s = m_F_s[sn];
@@ -419,7 +494,6 @@ void GRMaterialPoint::update_sigma(double dt, int sn) {
     mat3d G_alpha_h(0.0);
     double lambda_alpha_ntau_s = 0;
     mat3d F_alpha_ntau_s(1, 0, 0, 0, 1, 0, 0, 0, 1);
-    mat3d F_alpha_ntau_s_trans(1, 0, 0, 0, 1, 0, 0, 0, 1);
     double hat_S_alpha = 0;
     mat3ds sigma(0);
     double g_alpha = 1.0;
@@ -463,12 +537,12 @@ void GRMaterialPoint::update_sigma(double dt, int sn) {
 
     n = (sn - taun_min) + 1; //number of integration pts
 
-    int alpha = 0;
+    int alpha_count = 0;
         
 
     for (GRConstituent& constituent : m_constituents) {
 
-    	alpha = alpha + 1;
+    	alpha_count = alpha_count + 1;
 
         //Trapz rule allows for fast heredity integral evaluation
         k_2 = constituent.k_alpha[sn];
@@ -485,7 +559,6 @@ void GRMaterialPoint::update_sigma(double dt, int sn) {
         F_tau = F_s;
         J_tau = J_s;
 
-        g_alpha = constituent.g_alpha_h;
         G_alpha_h = constituent.G_alpha_h;
 
 		// compute U from polar decomposition of deformation gradient tensor
@@ -499,7 +572,7 @@ void GRMaterialPoint::update_sigma(double dt, int sn) {
         F_alpha_ntau_s = F_s*F_tau.inverse()*G_alpha_h_N;
 
         hat_sigma_2 = 1.0/J_s * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
-		hat_CC_2 = hat_dS_dlambda2_alpha * 1/J_s * IxIss.pp(F_alpha_ntau_s);
+		hat_CC_2 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11ss.pp(F_alpha_ntau_s);
 
 
         //Check if during G&R or at initial time point
@@ -528,8 +601,8 @@ void GRMaterialPoint::update_sigma(double dt, int sn) {
                 hat_dS_dlambda2_alpha = constitutive_return[1];
                 F_alpha_ntau_s = F_s*F_tau.inverse()*G_alpha_h_N;
 
-                hat_sigma_1 = 1.0/J_s * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
-				hat_CC_1 = hat_dS_dlambda2_alpha * 1/J_s * IxIss.pp(F_alpha_ntau_s);
+                hat_sigma_1 = 1.0 / J_s * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
+				hat_CC_1 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11ss.pp(F_alpha_ntau_s);
 
 
 				// Add integration contribution
@@ -579,10 +652,9 @@ void GRMaterialPoint::update_sigma(double dt, int sn) {
             //Check if anisotropic
             hat_sigma_2 = 1.0/J_s * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
 
-			hat_CC_2 = hat_dS_dlambda2_alpha * 1/J_s * IxIss.pp(F_alpha_ntau_s);
+			hat_CC_2 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11ss.pp(F_alpha_ntau_s);
 
             // Add in stress and stiffness contributions
-
             sigma += constituent.rhoR_alpha[sn] /
                 constituent.rho_hat_alpha_h * hat_sigma_2;                
 
@@ -623,7 +695,10 @@ void GRMaterialPoint::update_sigma(double dt, int sn) {
 
 		    sigma_act_mat = 1.0/J_s * (F_s * mat3dd(0,1,0) * F_s.transpose()).sym();
 			//TODO : Check this
-			CC_act_mat = hat_dS_dlambda2_alpha * 1/J_s * IxIss.pp(F_s);
+
+            CC_act_mat = tens4dmm(0.0);
+            CC_act_mat(1,1,1,1) = hat_dS_dlambda2_alpha;
+			CC_act_mat = 1.0 / J_s * CC_act_mat.pp(F_s);
 
 		    sigma += sigma_act_mat;
 			CC += CC_act_mat;
