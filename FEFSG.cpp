@@ -18,14 +18,18 @@
 BEGIN_FECORE_CLASS(FEFSG, FEElasticMaterial)
     ADD_PARAMETER(m_K      , FE_RANGE_GREATER_OR_EQUAL(0.0), "k")->setUnits(UNIT_PRESSURE)->MakeTopLevel(true)->setLongName("bulk modulus");
     ADD_PARAMETER(m_npmodel, "pressure_model")->setEnums("default\0NIKE3D\0Abaqus\0Abaqus (GOH)\0")->MakeTopLevel(true);
+    ADD_PARAMETER(m_dt      , FE_RANGE_GREATER_OR_EQUAL(0.0), "dt");
+    ADD_PARAMETER(m_gr_alpha      , FE_RANGE_GREATER_OR_EQUAL(0.0), "gr_alpha");
 END_FECORE_CLASS();
 
 // define the material parameters
 FEFSG::FEFSG(FEModel* pfem) : FEElasticMaterial(pfem)
 {
     m_K = 0;    // invalid value!
-    m_npmodel = 2;
-    m_secant_tangent = 1;
+    m_npmodel = 0;
+    m_dt = 1.0;
+    m_gr_alpha = 0.5;
+    m_secant_tangent = true;
 }
 
 FEMaterialPointData* GRMaterialPoint::Copy()
@@ -39,6 +43,7 @@ void GRMaterialPoint::Init()
 {
 	FEMaterialPointData::Init();
 
+    m_J_curr = 1.0;
 	nts = 720;
     sn = 0;
     K_delta_tauw = 0.0;
@@ -48,7 +53,7 @@ void GRMaterialPoint::Init()
     rho_hat_h = 0.0;
     m_lambda_act = std::vector<double>(720, 0.0);  // Vector of zeros of length 720
     m_F_s = std::vector<mat3d>(720, mat3d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0));     // Vector of mat3d variables of length 720
-    m_J_s = std::vector<double>(720, 0.0);         // Vector of zeros of length 720
+    m_J_s = std::vector<double>(720, 1.0);         // Vector of zeros of length 720
     rhoR = std::vector<double>(720, 0.0);         // Vector of zeros of length 720
     rho = std::vector<double>(720, 0.0);         // Vector of zeros of length 720
     ups_infl_d = std::vector<double>(720, 0.0); // Vector of zeros of length 720
@@ -100,14 +105,6 @@ void GRMaterialPoint::Init()
                   >> constituent.g_alpha_r >> constituent.g_alpha_theta >> constituent.g_alpha_z >> constituent.phi_alpha
                   >> constituent.k_alpha_h >> constituent.K_tauw_p_alpha_h >> constituent.K_sigma_p_alpha_h
                   >> constituent.K_tauw_d_alpha_h >> constituent.K_sigma_d_alpha_h;
-
-        /*
-    	std::cout << constituent.m_degradable << " " << constituent.m_inflammatory << " " << constituent.m_active << " " << constituent.m_polymer
-                  << " " << constituent.c1_alpha_h << " " << constituent.c2_alpha_h << " " << constituent.eta_alpha_h << " " << constituent.g_alpha_h
-                  << " " << constituent.g_alpha_r << " " << constituent.g_alpha_theta << " " << constituent.g_alpha_z << " " << constituent.phi_alpha
-                  << " " << constituent.k_alpha_h << " " << constituent.K_tauw_p_alpha_h << " " << constituent.K_sigma_p_alpha_h
-                  << " " << constituent.K_tauw_d_alpha_h << " " << constituent.K_sigma_d_alpha_h << "\n";
-        */
 
 	    constituent.eta_alpha_h = constituent.eta_alpha_h * M_PI / 180.0;
 	    constituent.rho_hat_alpha_h = rho_hat_h;
@@ -168,7 +165,7 @@ FEMaterialPointData* FEFSG::CreateMaterialPointData()
 	return new GRMaterialPoint(new FEElasticMaterialPoint); 
 }
 
-void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent)
+void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent, int call_type)
 {		
 	// The FEMaterialPoint classes are stored in a linked list. The specific material
 	// point data needed by this function can be accessed using the ExtractData member.
@@ -182,42 +179,106 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 	// but instead use the m_J member variable of FEMaterialPoint.
 	const mat3d &F = et.m_F;
 	const double J = et.m_J;
+    const double J_elem = et.m_J_tar;
 
 	// get current and end times
 	const double t = GetFEModel()->GetTime().currentTime;
 	//TODO: Get and set dt better time step?
-	const double dt = 0.25;
-	const int sn = int(t/dt);
+	const int sn = int(t/m_dt);
 
 	mat3d Q = GetLocalCS(mp);
 
-	pt.update_kinetics(dt, sn);
+    if (call_type){
+        printf("--------------------------------\n");
+        fflush(stdout);
 
-    double J_s = pt.m_J_s[sn];
+        pt.sigma_inv_curr = m_gr_alpha*et.m_s_inv + (1. - m_gr_alpha)* pt.sigma_inv_curr;
+        pt.update_kinetics(m_dt, sn);
+        pt.m_J_curr = m_gr_alpha*pt.m_J_s[sn] + (1. - m_gr_alpha)*pt.m_J_curr;
 
-	mat3d   Fbar = et.m_F*pow(J / J_s, -1.0 / 3.0);
+        //pt.sigma_inv_curr = m_gr_alpha*et.m_s_inv + (1 - m_gr_alpha)*pt.sigma_inv_curr;
+        //pt.m_J_curr = m_gr_alpha*pt.m_J_s[sn] + (1 - m_gr_alpha)*pt.m_J_curr;
+
+        printf("pt.m_J_s[sn]: %f\n", pt.m_J_s[sn]);
+        fflush(stdout);
+        printf("pt.m_J_curr: %f\n", pt.m_J_curr);
+        fflush(stdout);
+        printf("J_elem: %f\n", J_elem);
+        fflush(stdout);
+        printf("pt.sigma_inv_curr: %f\n", pt.sigma_inv_curr);
+        fflush(stdout);
+        printf("et.m_s_inv: %f\n", et.m_s_inv);
+        fflush(stdout);
+    } 
+
+	mat3d   Fbar = et.m_F*pow(J / pt.m_J_curr, -1.0 / 3.0);
     pt.m_F_s[sn] = Q.transpose() * Fbar * Q;
 
-	pt.update_sigma(dt, sn);
+	pt.update_sigma(m_dt, sn);
 
     // DEFINITELY THIS IS PUSH-FORWARD TO Q
-	mat3ds sbar = (J_s / J) * (Q * pt.m_sigma * Q.transpose()).sym();
+	mat3ds sbar = (pt.m_J_curr / J) * (Q * pt.m_sigma * Q.transpose()).sym();
 
     // calculate the stress as a sum of deviatoric stress and pressure
-    double p_val = UJ(J, J_s);
+    double p_val = UJ(J, pt.m_J_curr);
 
     stress = mat3dd(p_val) + sbar.dev();
-
-    pt.sigma_inv_curr = stress.tr();
 
 
     /*
 
-    printf("J: %f\n", J);
-    printf("J_s: %f\n", J_s);
-    printf("p_val: %f\n", p_val);
-    printf("sigma_inv_curr: %f\n", pt.sigma_inv_curr);
+    printf("pt.sigma_inv_curr: %f\n", pt.sigma_inv_curr);
     fflush(stdout);
+    printf("et.m_s_inv: %f\n", pt.sigma_inv_curr);
+    fflush(stdout);
+
+    printf("pt.m_sigma:\n");
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            printf("%f ", pt.m_sigma(i, j));
+        }
+        printf("\n");
+    }
+        printf("\n");
+    fflush(stdout);
+    printf("p_val: %f\n", p_val);
+    fflush(stdout);
+
+
+    printf("sigma_inv_curr: %f\n", pt.sigma_inv_curr);
+        printf("\n");
+    fflush(stdout);
+
+    printf("pt.m_sigma:\n");
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            printf("%f ", pt.m_sigma(i, j));
+        }
+        printf("\n");
+    }
+        printf("\n");
+    fflush(stdout);
+
+    printf("pt.m_F_s[sn]:\n");
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            printf("%f ", pt.m_F_s[sn](i, j));
+        }
+        printf("\n");
+    }
+        printf("\n");
+    fflush(stdout);
+
+    printf("pt.m_CC:\n");
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            printf("%f ", pt.m_CC(i, j, 0, 0));
+        }
+        printf("\n");
+    }
+        printf("\n");
+    fflush(stdout);
+
 
     printf("Q:\n");
     for (int i = 0; i < 3; ++i) {
@@ -250,15 +311,6 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j) {
             printf("%f ", pt.m_F_s[sn](i, j));
-        }
-        printf("\n");
-    }
-    fflush(stdout);
-
-    printf("pt.m_sigma:\n");
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            printf("%f ", pt.m_sigma(i, j));
         }
         printf("\n");
     }
@@ -300,7 +352,7 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 	const tens4dmm IxIss = tens4dmm(IxI);							// IxI in tens4dmm form
 	const tens4dmm IoIss = tens4dmm(IoI);							// IoI in tens4dmm form
 
-    tens4dmm cbar = (J_s / J) * pt.m_CC.pp(Q);
+    tens4dmm cbar = (pt.m_J_curr / J) * pt.m_CC.pp(Q);
 
     tens4dmm dev_tangent = cbar - 1./3.*((ddot(cbar, IxIss) + ddot(IxIss, cbar)) - IxIss*(cbar.tr()/3.))
     + 2./3.*((IoIss-IxIss/3.)*sbar.tr()-tens4dmm(dyad1s(sbar.dev(),I)));
@@ -316,7 +368,7 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
     // but we do need to add it here.
     //
     //        c_tilde         c_pressure            c_k
-    tangent = dev_tangent + (IxIss - IoIss*2)*p_val + IxIss*(UJJ(J, J_s)*J);
+    tangent = dev_tangent + (IxIss - IoIss*2)*p_val + IxIss*(UJJ(J, pt.m_J_curr)*J);
 
 
 }

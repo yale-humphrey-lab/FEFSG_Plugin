@@ -195,6 +195,7 @@ public:
     double sigma_inv_h;
     double sigma_inv_curr;
     double rho_hat_h;
+    double m_J_curr;
     std::vector<GRConstituent> m_constituents;
     std::vector<double> m_lambda_act;
     std::vector<mat3d> m_F_s;  // Vector of mat3d variables
@@ -245,7 +246,7 @@ public:
 
 public:
 	// function to perform material evaluation. calculates stress and tangent to avoid code duplication
-	void StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent);
+	void StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent, int call_type);
 
 	// This function calculates the spatial (i.e. Cauchy or true) stress.
 	// It takes one parameter, the FEMaterialPoint and returns a mat3ds object
@@ -253,7 +254,7 @@ public:
 	virtual mat3ds Stress(FEMaterialPoint& pt) override {
 		mat3ds stress;
 		tens4dmm tangent;
-		StressTangent(pt, stress, tangent);
+		StressTangent(pt, stress, tangent, 1);
 		return stress;
 	}
 
@@ -262,7 +263,6 @@ public:
 	// which is a fourth-order tensor with major and minor symmetries.
 	virtual tens4ds Tangent(FEMaterialPoint& pt) override {
 		tens4ds tangent;
-		printf("!!!!!!!!!!!!!!!!!!!!Using TANGENT \n");
 		fflush(stdout);
 		return tangent;
 	};
@@ -271,7 +271,7 @@ public:
 	virtual tens4dmm SecantTangent(FEMaterialPoint& pt, bool mat) override {
 		mat3ds stress;
 		tens4dmm tangent;
-		StressTangent(pt, stress, tangent);
+		StressTangent(pt, stress, tangent, 0);
 		return tangent;
 	}
 
@@ -314,6 +314,8 @@ public:
 public:
 	double	m_K;			//!< bulk modulus
 	int     m_npmodel;      //!< pressure model for U(J)
+	double     m_dt;      //!< timestep size
+	double     m_gr_alpha;      //!< timestep size
 
     DECLARE_FECORE_CLASS();
 

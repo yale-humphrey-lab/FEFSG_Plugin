@@ -30,6 +30,7 @@
         <material id="1" name="Material1" type="FSG">
             <density>1</density>
 		 	<k>10000.0</k>
+		 	<dt>0.1</dt>
         </material>
     </Material>
 <Geometry>

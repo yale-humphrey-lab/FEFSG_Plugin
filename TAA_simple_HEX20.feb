@@ -29,7 +29,9 @@
     <Material>
         <material id="1" name="Material1" type="FSG">
             <density>1</density>
-		 	<k>10000.0</k>
+		 	<k>100000.0</k>
+		 	<dt>1.0</dt>
+		 	<gr_alpha>0.1</gr_alpha>
         </material>
     </Material>
 <Geometry>
@@ -1780,8 +1782,8 @@
 		<load_controller id="1" type="loadcurve">
 			<interpolate>LINEAR</interpolate>
 			<points>
-				<point>0,1</point>
-				<point>10,1</point>
+				<point>0,1.4</point>
+				<point>10,1.4</point>
 			</points>
 		</load_controller>
 	</LoadData>
