@@ -30,12 +30,12 @@ def save_vtk_mesh(grid, filename):
 
 print("Initializing cylindrical vessel...")
 
-numCirc = 20*2 #Must be divisible by 4!
+numCirc = 48*2 #Must be divisible by 4!
 numLen = 1*2
-numRad = 4*2
-radius = 6.47e-01
-thickness = 4.10e-02
-length = 6.47e-02
+numRad = 1*2
+radius = 6.468e-01
+thickness = 4.02e-02
+length = 4.02e-02
 
 points = np.empty([(numCirc+1)*(numLen+1)*(numRad+1),3])
 cells = []

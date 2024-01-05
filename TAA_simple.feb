@@ -4,7 +4,7 @@
 	<Control>
 		<analysis>STATIC</analysis>
 		<time_steps>10</time_steps>
-		<step_size>1</step_size>
+		<step_size>1.0</step_size>
 		<solver>
 			<diverge_reform>1</diverge_reform>
 			<reform_each_time_step>1</reform_each_time_step>
@@ -12,9 +12,9 @@
 	        <etol>1e-16</etol>
 	        <rtol>1e-16</rtol>
 			<lstol>0.0</lstol>
-			<min_residual>1e-10</min_residual>
+			<min_residual>1e-20</min_residual>
             <qn_method type="BFGS"/>
-                <max_refs>1000</max_refs>
+                <max_refs>100</max_refs>
                 <max_ups>0</max_ups>
             <symmetric_stiffness>0</symmetric_stiffness>
 		</solver>
@@ -29,9 +29,8 @@
     <Material>
         <material id="1" name="Material1" type="FSG">
             <density>1</density>
-		 	<k>100000.0</k>
+		 	<k>1000000.0</k>
 		 	<dt>1.0</dt>
-		 	<gr_alpha>0.2</gr_alpha>
         </material>
     </Material>
 	<Geometry>

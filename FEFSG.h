@@ -182,6 +182,8 @@ public:
 
 	void Init() override;
 	void Serialize(DumpStream& ar) override;
+	//! Update material point data
+	void Update(const FETimeInfo& timeInfo);
 
 	void update_sigma(double dt, int sn);
 	void update_kinetics(double dt, int sn);
@@ -190,6 +192,7 @@ public:
 public:
     int nts;
     int sn;
+    double m_gr_dt;
     double K_delta_tauw;
     double K_delta_sigma;
     double sigma_inv_h;

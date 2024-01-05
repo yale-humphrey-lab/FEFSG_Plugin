@@ -39,11 +39,58 @@ FEMaterialPointData* GRMaterialPoint::Copy()
     return pt;
 }
 
+//! Update material point data.
+void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
+{
+
+    FEElasticMaterialPoint& et = *(this->ExtractData<FEElasticMaterialPoint>());
+
+    // get current and end times
+    const double t = timeInfo.currentTime;
+    const double dt = timeInfo.timeIncrement;
+    //printf("--------------------------------\n");
+    //fflush(stdout);
+
+    sn = int(sn + dt);
+
+    sigma_inv_curr = et.m_s_inv;
+    update_kinetics(1, sn);
+    m_J_curr = m_J_s[sn];
+
+    //pt.sigma_inv_curr = m_gr_alpha*et.m_s_inv + (1 - m_gr_alpha)*pt.sigma_inv_curr;
+    //pt.m_J_curr = m_gr_alpha*pt.m_J_s[sn] + (1 - m_gr_alpha)*pt.m_J_curr;
+
+    if (false){
+        printf("Up");
+        printf(" m_J_s[sn]: %f ", m_J_s[sn]);
+        fflush(stdout);
+        printf(" sigma_inv_curr: %f ", sigma_inv_curr);
+        fflush(stdout);
+        printf(" sn: %d ", sn);
+        fflush(stdout);
+    }
+
+
+    /*
+    printf("pt.m_J_curr: %f\n", pt.m_J_curr);
+    fflush(stdout);
+    printf("J_elem: %f\n", J_elem);
+    fflush(stdout);
+    printf("pt.sigma_inv_curr: %f\n", pt.sigma_inv_curr);
+    fflush(stdout);
+    */
+
+    //printf("sigma_inv_curr: %f\n", sigma_inv_curr);
+    //fflush(stdout);
+
+}
+
 void GRMaterialPoint::Init()
 {
 	FEMaterialPointData::Init();
 
     m_J_curr = 1.0;
+    m_gr_dt = 1.0;
 	nts = 720;
     sn = 0;
     K_delta_tauw = 0.0;
@@ -181,173 +228,20 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 	const double J = et.m_J;
     const double J_elem = et.m_J_tar;
 
-	// get current and end times
-	const double t = GetFEModel()->GetTime().currentTime;
 	//TODO: Get and set dt better time step?
-	const int sn = int(t/m_dt);
+	const int sn = pt.sn;
 
+    // push deformation gradient to local coordinates
 	mat3d Q = GetLocalCS(mp);
-
-    if (call_type){
-        //printf("--------------------------------\n");
-        //fflush(stdout);
-
-        pt.sigma_inv_curr = m_gr_alpha*et.m_s_inv + (1. - m_gr_alpha)* pt.sigma_inv_curr;
-        pt.update_kinetics(m_dt, sn);
-        pt.m_J_curr = m_gr_alpha*pt.m_J_s[sn] + (1. - m_gr_alpha)*pt.m_J_curr;
-
-        //pt.sigma_inv_curr = m_gr_alpha*et.m_s_inv + (1 - m_gr_alpha)*pt.sigma_inv_curr;
-        //pt.m_J_curr = m_gr_alpha*pt.m_J_s[sn] + (1 - m_gr_alpha)*pt.m_J_curr;
-
-        /*
-        printf("pt.m_J_s[sn]: %f\n", pt.m_J_s[sn]);
-        fflush(stdout);
-        printf("pt.m_J_curr: %f\n", pt.m_J_curr);
-        fflush(stdout);
-        printf("J_elem: %f\n", J_elem);
-        fflush(stdout);
-        printf("pt.sigma_inv_curr: %f\n", pt.sigma_inv_curr);
-        fflush(stdout);
-        printf("et.m_s_inv: %f\n", et.m_s_inv);
-        fflush(stdout);
-        getchar();
-        */
-    } 
-
 	mat3d   Fbar = et.m_F*pow(J / pt.m_J_curr, -1.0 / 3.0);
-    pt.m_F_s[sn] = Q.transpose() * Fbar * Q;
 
-	pt.update_sigma(m_dt, sn);
-
-    // DEFINITELY THIS IS PUSH-FORWARD TO Q
-	mat3ds sbar = (pt.m_J_curr / J) * (Q * pt.m_sigma * Q.transpose()).sym();
+    pt.m_F_s[sn] = Q.transpose() * et.m_F * Q;
 
     // calculate the stress as a sum of deviatoric stress and pressure
+	pt.update_sigma(m_dt, sn);
+	mat3ds sbar = (Q * pt.m_sigma * Q.transpose()).sym();
     double p_val = UJ(J, pt.m_J_curr);
-
     stress = mat3dd(p_val) + sbar.dev();
-
-
-    /*
-
-    printf("pt.sigma_inv_curr: %f\n", pt.sigma_inv_curr);
-    fflush(stdout);
-    printf("et.m_s_inv: %f\n", pt.sigma_inv_curr);
-    fflush(stdout);
-
-    printf("pt.m_sigma:\n");
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            printf("%f ", pt.m_sigma(i, j));
-        }
-        printf("\n");
-    }
-        printf("\n");
-    fflush(stdout);
-    printf("p_val: %f\n", p_val);
-    fflush(stdout);
-
-
-    printf("sigma_inv_curr: %f\n", pt.sigma_inv_curr);
-        printf("\n");
-    fflush(stdout);
-
-    printf("pt.m_sigma:\n");
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            printf("%f ", pt.m_sigma(i, j));
-        }
-        printf("\n");
-    }
-        printf("\n");
-    fflush(stdout);
-
-    printf("pt.m_F_s[sn]:\n");
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            printf("%f ", pt.m_F_s[sn](i, j));
-        }
-        printf("\n");
-    }
-        printf("\n");
-    fflush(stdout);
-
-    printf("pt.m_CC:\n");
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            printf("%f ", pt.m_CC(i, j, 0, 0));
-        }
-        printf("\n");
-    }
-        printf("\n");
-    fflush(stdout);
-
-
-    printf("Q:\n");
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            printf("%f ", Q(i, j));
-        }
-        printf("\n");
-    }
-    fflush(stdout);
-
-    printf("F:\n");
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            printf("%f ", F(i, j));
-        }
-        printf("\n");
-    }
-    fflush(stdout);
-
-    printf("Fbar:\n");
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            printf("%f ", Fbar(i, j));
-        }
-        printf("\n");
-    }
-    fflush(stdout);
-
-    printf("pt.m_F_s[sn]:\n");
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            printf("%f ", pt.m_F_s[sn](i, j));
-        }
-        printf("\n");
-    }
-    fflush(stdout);
-
-    printf("sbar:\n");
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            printf("%f ", sbar(i, j));
-        }
-        printf("\n");
-    }
-    fflush(stdout);
-
-    printf("stress:\n");
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            printf("%f ", stress(i, j));
-        }
-        printf("\n");
-    }
-    fflush(stdout);
-
-    printf("pt.m_CC:\n");
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            printf("%f ", pt.m_CC(i, j, 1, 1));
-        }
-        printf("\n");
-    }
-    fflush(stdout);
-
-    fflush(stdout);
-    */
 
 	const mat3dd  I(1.0);
 	const tens4ds IxI = dyad1s(I);
@@ -355,7 +249,7 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 	const tens4dmm IxIss = tens4dmm(IxI);							// IxI in tens4dmm form
 	const tens4dmm IoIss = tens4dmm(IoI);							// IoI in tens4dmm form
 
-    tens4dmm cbar = (pt.m_J_curr / J) * pt.m_CC.pp(Q);
+    tens4dmm cbar = pt.m_CC.pp(Q);
 
     tens4dmm dev_tangent = cbar - 1./3.*((ddot(cbar, IxIss) + ddot(IxIss, cbar)) - IxIss*(cbar.tr()/3.))
     + 2./3.*((IoIss-IxIss/3.)*sbar.tr()-tens4dmm(dyad1s(sbar.dev(),I)));
