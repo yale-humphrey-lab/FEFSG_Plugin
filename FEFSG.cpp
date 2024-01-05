@@ -189,8 +189,8 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 	mat3d Q = GetLocalCS(mp);
 
     if (call_type){
-        printf("--------------------------------\n");
-        fflush(stdout);
+        //printf("--------------------------------\n");
+        //fflush(stdout);
 
         pt.sigma_inv_curr = m_gr_alpha*et.m_s_inv + (1. - m_gr_alpha)* pt.sigma_inv_curr;
         pt.update_kinetics(m_dt, sn);
@@ -199,6 +199,7 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
         //pt.sigma_inv_curr = m_gr_alpha*et.m_s_inv + (1 - m_gr_alpha)*pt.sigma_inv_curr;
         //pt.m_J_curr = m_gr_alpha*pt.m_J_s[sn] + (1 - m_gr_alpha)*pt.m_J_curr;
 
+        /*
         printf("pt.m_J_s[sn]: %f\n", pt.m_J_s[sn]);
         fflush(stdout);
         printf("pt.m_J_curr: %f\n", pt.m_J_curr);
@@ -209,6 +210,8 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
         fflush(stdout);
         printf("et.m_s_inv: %f\n", et.m_s_inv);
         fflush(stdout);
+        getchar();
+        */
     } 
 
 	mat3d   Fbar = et.m_F*pow(J / pt.m_J_curr, -1.0 / 3.0);

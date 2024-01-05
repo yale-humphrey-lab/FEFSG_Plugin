@@ -3,18 +3,18 @@
     <Module type="solid"/>
 	<Control>
 		<analysis>STATIC</analysis>
-		<time_steps>1</time_steps>
+		<time_steps>10</time_steps>
 		<step_size>1</step_size>
 		<solver>
 			<diverge_reform>1</diverge_reform>
 			<reform_each_time_step>1</reform_each_time_step>
 	        <dtol>0</dtol>
-	        <etol>1e-20</etol>
-	        <rtol>1e-20</rtol>
+	        <etol>1e-16</etol>
+	        <rtol>1e-16</rtol>
 			<lstol>0.0</lstol>
-			<min_residual>1e-30</min_residual>
-            <qn_method type="Broyden"/>
-                <max_refs>4000</max_refs>
+			<min_residual>1e-10</min_residual>
+            <qn_method type="BFGS"/>
+                <max_refs>1000</max_refs>
                 <max_ups>0</max_ups>
             <symmetric_stiffness>0</symmetric_stiffness>
 		</solver>
@@ -29,9 +29,9 @@
     <Material>
         <material id="1" name="Material1" type="FSG">
             <density>1</density>
-		 	<k>1000000.0</k>
+		 	<k>100000.0</k>
 		 	<dt>1.0</dt>
-		 	<gr_alpha>0.025</gr_alpha>
+		 	<gr_alpha>0.2</gr_alpha>
         </material>
     </Material>
 	<Geometry>
