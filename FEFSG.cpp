@@ -18,13 +18,15 @@
 BEGIN_FECORE_CLASS(FEFSG, FEElasticMaterial)
     ADD_PARAMETER(m_K      , FE_RANGE_GREATER_OR_EQUAL(0.0), "k")->setUnits(UNIT_PRESSURE)->MakeTopLevel(true)->setLongName("bulk modulus");
     ADD_PARAMETER(m_npmodel, "pressure_model")->setEnums("default\0NIKE3D\0Abaqus\0Abaqus (GOH)\0")->MakeTopLevel(true);
+    ADD_PARAMETER(m_dt, FE_RANGE_GREATER_OR_EQUAL(0.0), "dt");
 END_FECORE_CLASS();
 
 // define the material parameters
 FEFSG::FEFSG(FEModel* pfem) : FEElasticMaterial(pfem)
 {
     m_K = 0;    // invalid value!
-    m_npmodel = 2;
+    m_npmodel = 0;
+    m_dt = 1.;
     m_secant_tangent = 1;
 }
 
@@ -186,19 +188,18 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 	// get current and end times
 	const double t = GetFEModel()->GetTime().currentTime;
 	//TODO: Get and set dt better time step?
-	const double dt = 0.25;
-	const int sn = int(t/dt);
+	const int sn = int(t/m_dt);
 
 	mat3d Q = GetLocalCS(mp);
 
-	pt.update_kinetics(dt, sn);
+	pt.update_kinetics(m_dt, sn);
 
     double J_s = pt.m_J_s[sn];
 
 	mat3d   Fbar = et.m_F*pow(J / J_s, -1.0 / 3.0);
     pt.m_F_s[sn] = Q.transpose() * Fbar * Q;
 
-	pt.update_sigma(dt, sn);
+	pt.update_sigma(m_dt, sn);
 
     // DEFINITELY THIS IS PUSH-FORWARD TO Q
 	mat3ds sbar = (J_s / J) * (Q * pt.m_sigma * Q.transpose()).sym();

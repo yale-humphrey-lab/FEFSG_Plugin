@@ -3,7 +3,7 @@
     <Module type="solid"/>
 	<Control>
 		<analysis>STATIC</analysis>
-		<time_steps>1</time_steps>
+		<time_steps>100</time_steps>
 		<step_size>1</step_size>
 		<solver>
 			<diverge_reform>1</diverge_reform>
@@ -30,7 +30,7 @@
         <material id="1" name="Material1" type="FSG">
             <density>1</density>
 		 	<k>1000000.0</k>
-		 	<pressure_model>2</pressure_model>
+		 	<dt>0.05</dt>
         </material>
     </Material>
 
@@ -8288,8 +8288,8 @@
 		<load_controller id="1" type="loadcurve">
 			<interpolate>LINEAR</interpolate>
 			<points>
-				<point>0,1</point>
-				<point>10,1</point>
+				<point>0,1.0</point>
+				<point>10,1.0</point>
 			</points>
 		</load_controller>
 	</LoadData>

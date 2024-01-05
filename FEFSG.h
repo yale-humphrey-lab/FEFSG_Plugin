@@ -314,6 +314,7 @@ public:
 public:
 	double	m_K;			//!< bulk modulus
 	int     m_npmodel;      //!< pressure model for U(J)
+	double     m_dt;      //!< pressure model for U(J)
 
     DECLARE_FECORE_CLASS();
 
