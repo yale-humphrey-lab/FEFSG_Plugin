@@ -31,7 +31,6 @@
             <density>1</density>
 		 	<k>100000.0</k>
 		 	<dt>1.0</dt>
-		 	<gr_alpha>0.001</gr_alpha>
         </material>
     </Material>
 

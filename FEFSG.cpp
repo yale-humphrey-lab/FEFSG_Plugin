@@ -228,7 +228,6 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 	const double J = et.m_J;
     const double J_elem = et.m_J_tar;
 
-	//TODO: Get and set dt better time step?
 	const int sn = pt.sn;
 
     // push deformation gradient to local coordinates

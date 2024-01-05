@@ -2,7 +2,7 @@ import numpy as np
 import pyvista as pv
 import vtk
 
-def create_quadratic_hexahedron_mesh(nodes, connectivity):
+def create_linear_hexahedron_mesh(nodes, connectivity):
     # Create points
     points = vtk.vtkPoints()
     for node in nodes:
@@ -11,12 +11,12 @@ def create_quadratic_hexahedron_mesh(nodes, connectivity):
     # Create the hexahedron cells
     hexahedra = vtk.vtkCellArray()
     for hexa in connectivity:
-        hexahedra.InsertNextCell(20, hexa)  # 20 is the number of points in a quadratic hexahedron
+        hexahedra.InsertNextCell(8, hexa)  # 8 is the number of points in a linear hexahedron
 
     # Create a VTK unstructured grid
     grid = vtk.vtkUnstructuredGrid()
     grid.SetPoints(points)
-    grid.SetCells(vtk.VTK_QUADRATIC_HEXAHEDRON, hexahedra)
+    grid.SetCells(vtk.VTK_HEXAHEDRON, hexahedra)
 
     return grid
 
@@ -30,9 +30,9 @@ def save_vtk_mesh(grid, filename):
 
 print("Initializing cylindrical vessel...")
 
-numCirc = 48*2 #Must be divisible by 4!
-numLen = 1*2
-numRad = 1*2
+numCirc = 120 #Must be divisible by 4!
+numLen = 1
+numRad = 4
 radius = 6.468e-01
 thickness = 4.02e-02
 length = 4.02e-02
@@ -53,20 +53,8 @@ for i in range(numLen+1):
     for j in range(numCirc+1):
         for k in range(numRad+1):
 
-            if j % 2 == 1:
-                xPt1 = (radius + thickness*k/numRad)*np.cos(2.0*(j-1)*np.pi/numCirc)
-                yPt1 = (radius + thickness*k/numRad)*np.sin(2.0*(j-1)*np.pi/numCirc)
-
-                xPt2 = (radius + thickness*k/numRad)*np.cos(2.0*(j+1)*np.pi/numCirc)
-                yPt2 = (radius + thickness*k/numRad)*np.sin(2.0*(j+1)*np.pi/numCirc)
-
-                xPt = (xPt1 + xPt2)/2.0
-                yPt = (yPt1 + yPt2)/2.0
-
-            else:
-                xPt = (radius + thickness*k/numRad)*np.cos(2.0*j*np.pi/numCirc)
-                yPt = (radius + thickness*k/numRad)*np.sin(2.0*j*np.pi/numCirc)
-
+            xPt = (radius + thickness*k/numRad)*np.cos(2.0*j*np.pi/numCirc)
+            yPt = (radius + thickness*k/numRad)*np.sin(2.0*j*np.pi/numCirc)
             zPt = length*i/numLen - length/2.0
 
             points[i*(numCirc+1)*(numRad+1) + j*(numRad+1) + k,:] = [xPt, yPt, zPt]
@@ -81,55 +69,29 @@ for i in range(numLen+1):
             
             num+=1
 
-coords=[[0, 1, 0],
-        [0, 1, 1],
-        [1, 1, 1],
+coords = [[0, 0, 0],
+        [1, 0, 0],
         [1, 1, 0],
-        [0, 0, 0],
+        [0, 1, 0],
         [0, 0, 1],
         [1, 0, 1],
-        [1, 0, 0]]
-
-hex_coords = [
-        [0, 0, 0],
-        [2, 0, 0],
-        [2, 2, 0],
-        [0, 2, 0],
-        [0, 0, 2],
-        [2, 0, 2],
-        [2, 2, 2],
-        [0, 2, 2],
-        [1, 0, 0],
-        [2, 1, 0],
-        [1, 2, 0],
-        [0, 1, 0],
-        [1, 0, 2],
-        [2, 1, 2],
-        [1, 2, 2],
-        [0, 1, 2],
-        [0, 0, 1],
-        [2, 0, 1],
-        [2, 2, 1],
-        [0, 2, 1]]
+        [1, 1, 1],
+        [0, 1, 1]]
 
 quad_coords =  [
         [0, 0],
-        [0, 2],
-        [2, 2],
-        [2, 0],
         [0, 1],
-        [1, 2],
-        [2, 1],
+        [1, 1],
         [1, 0]]
 
 
-for i in range(0, numLen, 2):
-    for j in range(0, numCirc, 2):
-        for k in range(0, numRad, 2):
+for i in range(0, numLen):
+    for j in range(0, numCirc):
+        for k in range(0, numRad):
 
             cellPts = []
 
-            for coord in hex_coords:
+            for coord in coords:
                 cellPts.append(point_ids[(i+coord[1])*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k+coord[2])])
 
             cells.append(cellPts)
@@ -142,10 +104,10 @@ for i in range(0, numLen, 2):
                     quadPts.append(point_ids[(i)*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k+coord[1])])
                 fix_z.append(quadPts)
 
-            if i == numLen-2:
+            if i == numLen-1:
                 quadPts = []
                 for coord in quad_coords:
-                    quadPts.append(point_ids[(i + 2)*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k+coord[1])])
+                    quadPts.append(point_ids[(i + 1)*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k+coord[1])])
                 fix_z.append(quadPts)
 
             if k == 0:
@@ -155,7 +117,7 @@ for i in range(0, numLen, 2):
                 inner_surf.append(quadPts)
 
 
-            theta = 2.0*(j+1)*np.pi/numCirc
+            theta = 2.0*(j+0.5)*np.pi/numCirc
 
             xPt = np.cos(theta)
             yPt = np.sin(theta)
@@ -175,7 +137,7 @@ with open("output_file.xml", "w") as f:
     f.write('\t</Nodes>\n')
 
     # Write Elements
-    f.write('\t<Elements type="hex20" mat="1" name="Part1">\n')
+    f.write('\t<Elements type="hex8" mat="1" name="Part1">\n')
     for i, element in enumerate(cells, start=1):
         str_val = ', '.join(map(str, element))
         f.write(f'\t\t<elem id="{i}">{str_val}</elem>\n')
@@ -195,13 +157,13 @@ with open("output_file.xml", "w") as f:
     f.write('\t<Surface name="FixZs">\n')
     for i, surface in enumerate(fix_z, start=1):
         str_val = ', '.join(map(str, surface))
-        f.write(f'\t\t<quad8 id="{i}">{str_val}</quad8>\n')
+        f.write(f'\t\t<quad4 id="{i}">{str_val}</quad4>\n')
     f.write('\t</Surface>\n')
 
     f.write('\t<Surface name="PressureLoad1">\n')
     for i, surface in enumerate(inner_surf, start=1):
         str_val = ', '.join(map(str, surface))
-        f.write(f'\t\t<quad8 id="{i}">{str_val}</quad8>\n')
+        f.write(f'\t\t<quad4 id="{i}">{str_val}</quad4>\n')
     f.write('\t</Surface>\n')
     f.write('</Geometry>\n')
     f.write('\n')
@@ -222,7 +184,7 @@ with open("output_file.xml", "w") as f:
 
 
 # Create the quadratic hexahedron mesh
-quadratic_hex_mesh = create_quadratic_hexahedron_mesh(points, np.array(cells)-1)
+linear_hex_mesh = create_linear_hexahedron_mesh(points, np.array(cells)-1)
 
 # Save the mesh to a VTK file
-save_vtk_mesh(quadratic_hex_mesh, 'quadratic_hex_mesh.vtu')
+save_vtk_mesh(linear_hex_mesh, 'linear_hex_mesh.vtu')

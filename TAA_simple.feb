@@ -63,20 +63,12 @@
 			<node id="4"/>
 			<node id="13"/>
 			<node id="14"/>
-			<node id="1"/>
-			<node id="2"/>
-			<node id="15"/>
-			<node id="16"/>
 		</NodeSet>
 		<NodeSet name="FixedDisplacement2">
-			<node id="5"/>
-			<node id="6"/>
 			<node id="7"/>
 			<node id="8"/>
 			<node id="9"/>
 			<node id="10"/>
-			<node id="11"/>
-			<node id="12"/>
 		</NodeSet>
 		<NodeSet name="FixedDisplacement3">
 			<node id="1"/>
