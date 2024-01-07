@@ -27,6 +27,32 @@ def save_vtk_mesh(grid, filename):
     writer.SetInputData(grid)
     writer.Write()
 
+def getAneurysmValue(z, theta):
+    """                                                                                                                                                                                                      
+    Get the value of vessel behavior based on point location and radius                                                                                                                                      
+    """
+
+    zod = 0.3
+    zapex = 0
+
+    thetaod = np.pi
+    thetaapex = np.pi
+
+    vend = 1
+    vapex = 10
+    vz = 2
+    vtheta = 2
+
+    vesselValue = (
+        vend
+        + (vapex - vend) * np.exp(-np.abs((z - zapex) / zod) ** vz)
+        * np.exp(-np.abs((theta - thetaapex) / thetaod) ** vtheta)
+    )
+
+    #zPt = point[2]
+    #vesselValue = 0.65*np.exp(-abs(zPt/(radius*4.0))**2)
+    return vesselValue
+
 
 print("Initializing cylindrical vessel...")
 
@@ -46,6 +72,7 @@ fix_z = []
 inner_surf = []
 axis_a = []
 axis_d = []
+aneurysm_val = []
 
 num = 1
 
@@ -160,8 +187,13 @@ for i in range(0, numLen, 2):
             xPt = np.cos(theta)
             yPt = np.sin(theta)
 
+
+            zPt = length*(i+1)/numLen - length/2.0
+
+
             axis_a.append([xPt,yPt,0])
             axis_d.append([-yPt,xPt,0])
+            aneurysm_val.append(getAneurysmValue(zPt,theta))
 
 
 with open("output_file.xml", "w") as f:
@@ -217,6 +249,14 @@ with open("output_file.xml", "w") as f:
         f.write(f'\t\t\t<d>{str_val2}</d>\n')
         f.write(f'\t\t</elem>\n')
 
+
+    f.write('\t</ElementData>\n')
+
+
+    f.write('\tElementData name="map_K_delta_sigma" elem_set="Part1"\n')
+
+    for i, val in enumerate(aneurysm_val, start=1):
+        f.write(f'\t\t<elem lid="{i+1}"> {val} </elem>\n')
 
     f.write('\t</ElementData>\n')
 
