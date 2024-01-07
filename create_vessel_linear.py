@@ -30,7 +30,7 @@ def save_vtk_mesh(grid, filename):
 
 print("Initializing cylindrical vessel...")
 
-numCirc = 120 #Must be divisible by 4!
+numCirc = 20 #Must be divisible by 4!
 numLen = 1
 numRad = 4
 radius = 6.468e-01

@@ -31,6 +31,7 @@
             <density>1</density>
 		 	<k>1000000.0</k>
 		 	<dt>1.0</dt>
+		 	<K_delta_sigma>map_K_delta_sigma</K_delta_sigma>
         </material>
     </Material>
 	<Geometry>
@@ -130,6 +131,12 @@
 				<a>0.707107, -0.707107, 0</a>
 				<d>0.707107, 0.707107, 0</d>
 			</elem>
+		</ElementData>
+		 <ElementData name="map_K_delta_sigma" elem_set="Part1"> 
+			<elem lid="1"> 0.1 </elem>
+			<elem lid="2"> 0.2 </elem>
+			<elem lid="3"> 0.3 </elem>
+			<elem lid="4"> 0.4 </elem>
 		</ElementData>
 	</MeshData>
     <Loads>

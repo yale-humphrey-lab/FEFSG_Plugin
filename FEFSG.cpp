@@ -19,7 +19,7 @@ BEGIN_FECORE_CLASS(FEFSG, FEElasticMaterial)
     ADD_PARAMETER(m_K      , FE_RANGE_GREATER_OR_EQUAL(0.0), "k")->setUnits(UNIT_PRESSURE)->MakeTopLevel(true)->setLongName("bulk modulus");
     ADD_PARAMETER(m_npmodel, "pressure_model")->setEnums("default\0NIKE3D\0Abaqus\0Abaqus (GOH)\0")->MakeTopLevel(true);
     ADD_PARAMETER(m_dt      , FE_RANGE_GREATER_OR_EQUAL(0.0), "dt");
-    ADD_PARAMETER(m_gr_alpha      , FE_RANGE_GREATER_OR_EQUAL(0.0), "gr_alpha");
+    ADD_PARAMETER(m_K_delta_sigma      , FE_RANGE_GREATER_OR_EQUAL(0.0), "K_delta_sigma");
 END_FECORE_CLASS();
 
 // define the material parameters
@@ -28,8 +28,8 @@ FEFSG::FEFSG(FEModel* pfem) : FEElasticMaterial(pfem)
     m_K = 0;    // invalid value!
     m_npmodel = 0;
     m_dt = 1.0;
-    m_gr_alpha = 0.5;
     m_secant_tangent = true;
+    m_K_delta_sigma = 0;
 }
 
 FEMaterialPointData* GRMaterialPoint::Copy()
@@ -69,19 +69,6 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
         printf(" sn: %d ", sn);
         fflush(stdout);
     }
-
-
-    /*
-    printf("pt.m_J_curr: %f\n", pt.m_J_curr);
-    fflush(stdout);
-    printf("J_elem: %f\n", J_elem);
-    fflush(stdout);
-    printf("pt.sigma_inv_curr: %f\n", pt.sigma_inv_curr);
-    fflush(stdout);
-    */
-
-    //printf("sigma_inv_curr: %f\n", sigma_inv_curr);
-    //fflush(stdout);
 
 }
 
@@ -232,8 +219,7 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 
     // push deformation gradient to local coordinates
 	mat3d Q = GetLocalCS(mp);
-	mat3d   Fbar = et.m_F*pow(J / pt.m_J_curr, -1.0 / 3.0);
-
+    
     pt.m_F_s[sn] = Q.transpose() * et.m_F * Q;
 
     // calculate the stress as a sum of deviatoric stress and pressure

@@ -13,6 +13,7 @@
 // We need to include this file since our new material class will inherit from
 // FEElasticMaterial which is defined in this include files.
 #include "FEBioMech/FEElasticMaterial.h"
+#include <FECore/FEModelParam.h>
 #include <iostream>								// to use cin.get()
 
 class GRConstituent {
@@ -318,7 +319,7 @@ public:
 	double	m_K;			//!< bulk modulus
 	int     m_npmodel;      //!< pressure model for U(J)
 	double     m_dt;      //!< timestep size
-	double     m_gr_alpha;      //!< timestep size
+	FEParamDouble     m_K_delta_sigma;      //!< K_delta_sigma
 
     DECLARE_FECORE_CLASS();
 
