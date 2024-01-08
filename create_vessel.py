@@ -33,19 +33,18 @@ def getAneurysmValue(z, theta):
     """
 
     zod = 0.3
-    zapex = 0
+    zapex = 0.0
 
     thetaod = np.pi
     thetaapex = np.pi
 
-    vend = 1
-    vapex = 10
-    vz = 2
-    vtheta = 2
+    vend = 0.1
+    vapex = 1.0
+    vz = 2.0
+    vtheta = 2.0
 
     vesselValue = (
-        vend
-        + (vapex - vend) * np.exp(-np.abs((z - zapex) / zod) ** vz)
+        vend + (vapex - vend) * np.exp(-np.abs((z - zapex) / zod) ** vz)
         * np.exp(-np.abs((theta - thetaapex) / thetaod) ** vtheta)
     )
 
@@ -100,7 +99,6 @@ for i in range(numLen+1):
             point_ids.append(num)
 
             if  (j == 0 or j == 2*numCirc/4) and k == 0:
-                print("test " + str(j) + " " + str(i))
                 fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
 
             if (j == 1*numCirc/4 or j == 3*numCirc/4) and k == 0:
@@ -187,12 +185,11 @@ for i in range(0, numLen, 2):
             xPt = np.cos(theta)
             yPt = np.sin(theta)
 
-
             zPt = length*(i+1)/numLen - length/2.0
-
 
             axis_a.append([xPt,yPt,0])
             axis_d.append([-yPt,xPt,0])
+
             aneurysm_val.append(getAneurysmValue(zPt,theta))
 
 
@@ -253,10 +250,10 @@ with open("output_file.xml", "w") as f:
     f.write('\t</ElementData>\n')
 
 
-    f.write('\tElementData name="map_K_delta_sigma" elem_set="Part1"\n')
+    f.write('\t<ElementData name="map_a_val" elem_set="Part1">\n')
 
     for i, val in enumerate(aneurysm_val, start=1):
-        f.write(f'\t\t<elem lid="{i+1}"> {val} </elem>\n')
+        f.write(f'\t\t<elem lid="{i}"> {val} </elem>\n')
 
     f.write('\t</ElementData>\n')
 

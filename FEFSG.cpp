@@ -18,8 +18,7 @@
 BEGIN_FECORE_CLASS(FEFSG, FEElasticMaterial)
     ADD_PARAMETER(m_K      , FE_RANGE_GREATER_OR_EQUAL(0.0), "k")->setUnits(UNIT_PRESSURE)->MakeTopLevel(true)->setLongName("bulk modulus");
     ADD_PARAMETER(m_npmodel, "pressure_model")->setEnums("default\0NIKE3D\0Abaqus\0Abaqus (GOH)\0")->MakeTopLevel(true);
-    ADD_PARAMETER(m_dt      , FE_RANGE_GREATER_OR_EQUAL(0.0), "dt");
-    ADD_PARAMETER(m_K_delta_sigma      , FE_RANGE_GREATER_OR_EQUAL(0.0), "K_delta_sigma");
+    ADD_PARAMETER(m_a_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "a_val");
 END_FECORE_CLASS();
 
 // define the material parameters
@@ -27,9 +26,8 @@ FEFSG::FEFSG(FEModel* pfem) : FEElasticMaterial(pfem)
 {
     m_K = 0;    // invalid value!
     m_npmodel = 0;
-    m_dt = 1.0;
     m_secant_tangent = true;
-    m_K_delta_sigma = 0;
+    m_a_val = 0;
 }
 
 FEMaterialPointData* GRMaterialPoint::Copy()
@@ -54,7 +52,7 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
     sn = int(sn + dt);
 
     sigma_inv_curr = et.m_s_inv;
-    update_kinetics(1, sn);
+    update_kinetics(sn);
     m_J_curr = m_J_s[sn];
 
     //pt.sigma_inv_curr = m_gr_alpha*et.m_s_inv + (1 - m_gr_alpha)*pt.sigma_inv_curr;
@@ -77,7 +75,7 @@ void GRMaterialPoint::Init()
 	FEMaterialPointData::Init();
 
     m_J_curr = 1.0;
-    m_gr_dt = 1.0;
+    m_dt = 1.0;
 	nts = 720;
     sn = 0;
     K_delta_tauw = 0.0;
@@ -114,7 +112,7 @@ void GRMaterialPoint::Init()
     }
 
     // Read non-vector values from the first line
-    inputFile >> rho_hat_h >> bar_tauw_h >> sigma_inv_h >> K_delta_tauw >> K_delta_sigma >> k_act >> lambda_0 >> lambda_m >> CB >> CS >> T_act;
+    inputFile >> m_dt >> rho_hat_h >> bar_tauw_h >> sigma_inv_h >> K_delta_tauw >> K_delta_sigma >> k_act >> lambda_0 >> lambda_m >> CB >> CS >> T_act;
 
     sigma_inv_curr = sigma_inv_h;
     bar_tauw_curr = bar_tauw_h;
@@ -219,11 +217,14 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 
     // push deformation gradient to local coordinates
 	mat3d Q = GetLocalCS(mp);
-    
+
+    pt.K_delta_sigma = 0.184*m_a_val(mp);
+    pt.m_constituents[0].c1_alpha_h = 89.710*(1.0 - 0.595*m_a_val(mp));
+
     pt.m_F_s[sn] = Q.transpose() * et.m_F * Q;
 
     // calculate the stress as a sum of deviatoric stress and pressure
-	pt.update_sigma(m_dt, sn);
+	pt.update_sigma(sn);
 	mat3ds sbar = (Q * pt.m_sigma * Q.transpose()).sym();
     double p_val = UJ(J, pt.m_J_curr);
     stress = mat3dd(p_val) + sbar.dev();
@@ -255,7 +256,7 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 
 }
 
-void GRMaterialPoint::update_kinetics(double dt, int sn) {
+void GRMaterialPoint::update_kinetics(int sn) {
 
 
     //This function updates the kinetics for G&R.
@@ -350,10 +351,10 @@ void GRMaterialPoint::update_kinetics(double dt, int sn) {
 
                 //Trapazoidal rule     
                 k_1 = constituent.k_alpha[taun];
-                q_1 = exp(-(k_2 + k_1) * dt / 2) * q_2;
+                q_1 = exp(-(k_2 + k_1) * m_dt / 2) * q_2;
                 mq_1 = constituent.mR_alpha[taun] * q_1;
 
-                rhoR_alpha_s += (mq_2 + mq_1) * dt / 2;
+                rhoR_alpha_s += (mq_2 + mq_1) * m_dt / 2;
 
                 k_2 = k_1;
                 q_2 = q_1;
@@ -393,7 +394,7 @@ void GRMaterialPoint::update_kinetics(double dt, int sn) {
 
 }
 
-void GRMaterialPoint::update_sigma(double dt, int sn) {
+void GRMaterialPoint::update_sigma(int sn) {
 
 
     //Get current time index
@@ -529,13 +530,13 @@ void GRMaterialPoint::update_sigma(double dt, int sn) {
 
                 //Find 1st intermediate kinetics
                 k_1 = constituent.k_alpha[taun];
-                q_1 = exp(-(k_2 + k_1) * dt / 2) * q_2;
+                q_1 = exp(-(k_2 + k_1) * m_dt / 2) * q_2;
                 mq_1 = constituent.mR_alpha[taun] * q_1;
 
                 //Find intermediate active state
                 if (constituent.m_active == 1) {
                     lambda_act_1 = sqrt(C_s(1, 1))/m_lambda_act[taun];
-                    q_act_1 = exp(-k_act * dt) * q_act_2;
+                    q_act_1 = exp(-k_act * m_dt) * q_act_2;
                 }
 
                 constitutive_return = constituent.constitutive(sn, taun);
@@ -548,14 +549,14 @@ void GRMaterialPoint::update_sigma(double dt, int sn) {
 
 
 				// Add integration contribution
-				sigma += (mq_2 * hat_sigma_2 + mq_1 * hat_sigma_1) / constituent.rho_hat_alpha_h * dt / 2;
-                CC += (mq_2 * hat_CC_2 + mq_1 * hat_CC_1) / constituent.rho_hat_alpha_h * dt / 2;
+				sigma += (mq_2 * hat_sigma_2 + mq_1 * hat_sigma_1) / constituent.rho_hat_alpha_h * m_dt / 2;
+                CC += (mq_2 * hat_CC_2 + mq_1 * hat_CC_1) / constituent.rho_hat_alpha_h * m_dt / 2;
 
                 //Store active vars for next iteration
                 //Find intermediate active state
 
                 if (constituent.m_active == 1) {
-                    lambda_act += k_act * (q_act_2 * lambda_act_2 + q_act_1 * lambda_act_1) * dt / 2;
+                    lambda_act += k_act * (q_act_2 * lambda_act_2 + q_act_1 * lambda_act_1) * m_dt / 2;
                     lambda_act_2 = lambda_act_1;
                     q_act_2 = q_act_1;
                 }
@@ -607,7 +608,7 @@ void GRMaterialPoint::update_sigma(double dt, int sn) {
 
         if (taun_min == 0 && constituent.m_active == 1) {
             if (!constituent.m_degradable){
-                q_act_1 = exp(-k_act * dt) * q_act_2;
+                q_act_1 = exp(-k_act * m_dt) * q_act_2;
             }
             lambda_act += sqrt(C_s(2,2))/m_lambda_act[0] * q_act_1;
         }

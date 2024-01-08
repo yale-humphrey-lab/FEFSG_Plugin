@@ -186,14 +186,14 @@ public:
 	//! Update material point data
 	void Update(const FETimeInfo& timeInfo);
 
-	void update_sigma(double dt, int sn);
-	void update_kinetics(double dt, int sn);
+	void update_sigma(int sn);
+	void update_kinetics(int sn);
 
 
 public:
     int nts;
     int sn;
-    double m_gr_dt;
+    double m_dt;
     double K_delta_tauw;
     double K_delta_sigma;
     double sigma_inv_h;
@@ -318,8 +318,7 @@ public:
 public:
 	double	m_K;			//!< bulk modulus
 	int     m_npmodel;      //!< pressure model for U(J)
-	double     m_dt;      //!< timestep size
-	FEParamDouble     m_K_delta_sigma;      //!< K_delta_sigma
+	FEParamDouble     m_a_val;      //!< K_delta_sigma
 
     DECLARE_FECORE_CLASS();
 
