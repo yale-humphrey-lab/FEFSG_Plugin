@@ -217,7 +217,7 @@ public:
     double T_act;
     double k_act;
     mat3ds m_sigma;
-    tens4dmm m_CC;
+    tens4ds m_CC;
 };
 
 
@@ -229,8 +229,6 @@ class FEFSG : public FEElasticMaterial
 {
 public:
 	FEFSG(FEModel* pfem);
-
-	bool UseSecantTangent() override { return m_secant_tangent; }
 
 	//! create material point data for this material
 	FEMaterialPointData* CreateMaterialPointData() override;
@@ -246,18 +244,18 @@ public:
 	// setting m_secant_tangent = true so FESolidMaterial uses SecantTangent
 	// (allows minor symmetry only tangents) instead of Tangent (minor and major symmetries)
 	// 	 { return m_secant_tangent; }
-    bool m_secant_tangent;   //!< flag for using secant tangent
+    //bool m_secant_tangent;   //!< flag for using secant tangent
 
 public:
 	// function to perform material evaluation. calculates stress and tangent to avoid code duplication
-	void StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent, int call_type);
+	void StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent, int call_type);
 
 	// This function calculates the spatial (i.e. Cauchy or true) stress.
 	// It takes one parameter, the FEMaterialPoint and returns a mat3ds object
 	// which is a symmetric second-order tensor.
 	virtual mat3ds Stress(FEMaterialPoint& pt) override {
 		mat3ds stress;
-		tens4dmm tangent;
+		tens4ds tangent;
 		StressTangent(pt, stress, tangent, 1);
 		return stress;
 	}
@@ -266,18 +264,11 @@ public:
 	// It takes one parameter, the FEMaterialPoint and retursn a tens4ds object
 	// which is a fourth-order tensor with major and minor symmetries.
 	virtual tens4ds Tangent(FEMaterialPoint& pt) override {
-		tens4ds tangent;
-		fflush(stdout);
-		return tangent;
-	};
-
-	// minor symmetries only
-	virtual tens4dmm SecantTangent(FEMaterialPoint& pt, bool mat) override {
 		mat3ds stress;
-		tens4dmm tangent;
+		tens4ds tangent;
 		StressTangent(pt, stress, tangent, 0);
 		return tangent;
-	}
+	};
 
 public:
     // TODO: removing virtual from the following 3 functions causes changes

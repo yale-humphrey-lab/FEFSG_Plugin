@@ -26,7 +26,7 @@ FEFSG::FEFSG(FEModel* pfem) : FEElasticMaterial(pfem)
 {
     m_K = 0;    // invalid value!
     m_npmodel = 0;
-    m_secant_tangent = true;
+    //m_secant_tangent = true;
     m_a_val = 0;
 }
 
@@ -99,7 +99,7 @@ void GRMaterialPoint::Init()
     T_act = 0.0;
     k_act = 0.0;
     m_sigma = mat3ds(0.0);
-    m_CC = tens4dmm(0.0);
+    m_CC = tens4ds(0.0);
 
 
     // Hardcoded filename as a string variable
@@ -197,7 +197,7 @@ FEMaterialPointData* FEFSG::CreateMaterialPointData()
 	return new GRMaterialPoint(new FEElasticMaterialPoint); 
 }
 
-void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent, int call_type)
+void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent, int call_type)
 {		
 	// The FEMaterialPoint classes are stored in a linked list. The specific material
 	// point data needed by this function can be accessed using the ExtractData member.
@@ -212,7 +212,6 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 	const mat3d &F = et.m_F;
 	const double J = et.m_J;
     const double J_elem = et.m_J_tar;
-
 	const int sn = pt.sn;
 
     // push deformation gradient to local coordinates
@@ -232,13 +231,11 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
 	const mat3dd  I(1.0);
 	const tens4ds IxI = dyad1s(I);
 	const tens4ds IoI = dyad4s(I);
-	const tens4dmm IxIss = tens4dmm(IxI);							// IxI in tens4dmm form
-	const tens4dmm IoIss = tens4dmm(IoI);							// IoI in tens4dmm form
 
-    tens4dmm cbar = pt.m_CC.pp(Q);
+    tens4ds cbar = pt.m_CC.pp(Q);
 
-    tens4dmm dev_tangent = cbar - 1./3.*((ddot(cbar, IxIss) + ddot(IxIss, cbar)) - IxIss*(cbar.tr()/3.))
-    + 2./3.*((IoIss-IxIss/3.)*sbar.tr()-tens4dmm(dyad1s(sbar.dev(),I)));
+    tens4ds dev_tangent = cbar - 1./3.*(ddots(cbar, IxI) - IxI*(cbar.tr()/3.))
+    + 2./3.*((IoI-IxI/3.)*sbar.tr()-dyad1s(sbar.dev(),I));
 
     // tangent is sum of three terms
     // C = c_tilde + c_pressure + c_k
@@ -251,7 +248,16 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4dmm& tangent
     // but we do need to add it here.
     //
     //        c_tilde         c_pressure            c_k
-    tangent = dev_tangent + (IxIss - IoIss*2)*p_val + IxIss*(UJJ(J, pt.m_J_curr)*J);
+    tangent = dev_tangent + (IxI - IoI*2)*p_val + IxI*(UJJ(J, pt.m_J_curr)*J);
+
+    // Write outputs to unused velocity and acceleration vectors for writeout
+    // TODO: confirm what "stiffness" means in this context
+    et.m_v.x = pt.m_J_curr;                    // Target volume
+    et.m_v.y = m_a_val(mp);     // Aneurysm injury
+    et.m_v.z = pt.m_constituents[0].rhoR_alpha[sn];     // Generally, smooth muscle density
+    et.m_a.x = pt.m_CC(0,0,0,0);     // Radial stiffness
+    et.m_a.y = pt.m_CC(1,1,1,1);     // Circumfrential stiffness
+    et.m_a.z = pt.m_CC(2,2,2,2);     // Axial stiffness
 
 
 }
@@ -402,7 +408,6 @@ void GRMaterialPoint::update_sigma(int sn) {
 
     mat3ds  full1(1.0,1.0,1.0,1.0,1.0,1.0);
     tens4ds full11 = dyad1s(full1);
-    tens4dmm full11ss = tens4dmm(full11);                     // full11 in tens4dmm form
 
     //Find the current deformation gradient
     mat3d F_s = m_F_s[sn];
@@ -459,10 +464,10 @@ void GRMaterialPoint::update_sigma(int sn) {
     vector<double> constitutive_return = { 0, 0 };
 
     //Full material stiffness tensor
-    tens4dmm CC(0.0);
-    tens4dmm CC_act_mat(0.0);
-    tens4dmm hat_CC_1(0.0);
-    tens4dmm hat_CC_2(0.0);
+    tens4ds CC(0.0);
+    tens4ds CC_act_mat(0.0);
+    tens4ds hat_CC_1(0.0);
+    tens4ds hat_CC_2(0.0);
 
     //Integration variables
     //For mass
@@ -515,7 +520,7 @@ void GRMaterialPoint::update_sigma(int sn) {
         F_alpha_ntau_s = F_s*F_tau.inverse()*G_alpha_h_N;
 
         hat_sigma_2 = 1.0/J_s * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
-		hat_CC_2 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11ss.pp(F_alpha_ntau_s);
+		hat_CC_2 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11.pp(F_alpha_ntau_s);
 
 
         //Check if during G&R or at initial time point
@@ -545,7 +550,7 @@ void GRMaterialPoint::update_sigma(int sn) {
                 F_alpha_ntau_s = F_s*F_tau.inverse()*G_alpha_h_N;
 
                 hat_sigma_1 = 1.0 / J_s * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
-				hat_CC_1 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11ss.pp(F_alpha_ntau_s);
+				hat_CC_1 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11.pp(F_alpha_ntau_s);
 
 
 				// Add integration contribution
@@ -595,7 +600,7 @@ void GRMaterialPoint::update_sigma(int sn) {
             //Check if anisotropic
             hat_sigma_2 = 1.0/J_s * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
 
-			hat_CC_2 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11ss.pp(F_alpha_ntau_s);
+			hat_CC_2 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11.pp(F_alpha_ntau_s);
 
             // Add in stress and stiffness contributions
             sigma += constituent.rhoR_alpha[sn] /
@@ -639,7 +644,7 @@ void GRMaterialPoint::update_sigma(int sn) {
 		    sigma_act_mat = 1.0/J_s * (F_s * mat3dd(0,1,0) * F_s.transpose()).sym();
 			//TODO : Check this
 
-            CC_act_mat = tens4dmm(0.0);
+            CC_act_mat = tens4ds(0.0);
             CC_act_mat(1,1,1,1) = hat_dS_dlambda2_alpha;
 			CC_act_mat = 1.0 / J_s * CC_act_mat.pp(F_s);
 
