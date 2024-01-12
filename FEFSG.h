@@ -309,6 +309,9 @@ public:
 public:
 	double	m_K;			//!< bulk modulus
 	int     m_npmodel;      //!< pressure model for U(J)
+	FEParamVec3     e_r;      //
+	FEParamVec3     e_t;      //
+	FEParamVec3     e_z;      //
 	FEParamDouble     m_a_val;      //!< K_delta_sigma
 
     DECLARE_FECORE_CLASS();

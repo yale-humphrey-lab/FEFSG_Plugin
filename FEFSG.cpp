@@ -19,6 +19,9 @@ BEGIN_FECORE_CLASS(FEFSG, FEElasticMaterial)
     ADD_PARAMETER(m_K      , FE_RANGE_GREATER_OR_EQUAL(0.0), "k")->setUnits(UNIT_PRESSURE)->MakeTopLevel(true)->setLongName("bulk modulus");
     ADD_PARAMETER(m_npmodel, "pressure_model")->setEnums("default\0NIKE3D\0Abaqus\0Abaqus (GOH)\0")->MakeTopLevel(true);
     ADD_PARAMETER(m_a_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "a_val");
+    ADD_PARAMETER(e_r , "e_r");
+    ADD_PARAMETER(e_t , "e_t");
+    ADD_PARAMETER(e_z , "e_z");
 END_FECORE_CLASS();
 
 // define the material parameters
@@ -28,6 +31,9 @@ FEFSG::FEFSG(FEModel* pfem) : FEElasticMaterial(pfem)
     m_npmodel = 0;
     //m_secant_tangent = true;
     m_a_val = 0;
+    e_r = vec3d(1,0,0);
+    e_t = vec3d(0,1,0);
+    e_z = vec3d(0,0,1);
 }
 
 FEMaterialPointData* GRMaterialPoint::Copy()
@@ -215,7 +221,7 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent,
 	const int sn = pt.sn;
 
     // push deformation gradient to local coordinates
-	mat3d Q = GetLocalCS(mp);
+    mat3d Q = mat3d(e_r(mp), e_t(mp), e_z(mp));
 
     pt.K_delta_sigma = 0.184*m_a_val(mp);
     pt.m_constituents[0].c1_alpha_h = 89.710*(1.0 - 0.595*m_a_val(mp));
@@ -252,9 +258,9 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent,
 
     // Write outputs to unused velocity and acceleration vectors for writeout
     // TODO: confirm what "stiffness" means in this context
-    et.m_v.x = pt.m_J_curr;                    // Target volume
-    et.m_v.y = m_a_val(mp);     // Aneurysm injury
-    et.m_v.z = pt.m_constituents[0].rhoR_alpha[sn];     // Generally, smooth muscle density
+    et.m_v.x = pt.m_J_curr;                             // Target volume
+    et.m_v.y = m_a_val(mp);                             // Aneurysm injury
+    et.m_v.z = pt.m_constituents[0].rhoR_alpha[sn];     // Generally, elasticity density
     et.m_a.x = pt.m_CC(0,0,0,0);     // Radial stiffness
     et.m_a.y = pt.m_CC(1,1,1,1);     // Circumfrential stiffness
     et.m_a.z = pt.m_CC(2,2,2,2);     // Axial stiffness
