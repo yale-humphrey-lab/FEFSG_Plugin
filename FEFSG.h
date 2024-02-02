@@ -198,11 +198,16 @@ public:
     double K_delta_sigma;
     double sigma_inv_h;
     double sigma_inv_curr;
+    std::vector<double> sigma_inv_hist;
     double rho_hat_h;
     double m_J_curr;
+    double m_p_val_curr;
+    double m_p_val_prev;
     std::vector<GRConstituent> m_constituents;
     std::vector<double> m_lambda_act;
     std::vector<mat3d> m_F_s;  // Vector of mat3d variables
+    mat3d m_F_curr;  // Vector of mat3d variables
+    mat3d m_Q;  // Vector of mat3d variables
     std::vector<double> m_J_s;
     std::vector<double> rhoR;
     std::vector<double> rho;
