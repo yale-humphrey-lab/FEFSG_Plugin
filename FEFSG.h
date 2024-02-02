@@ -202,6 +202,8 @@ public:
     std::vector<GRConstituent> m_constituents;
     std::vector<double> m_lambda_act;
     std::vector<mat3d> m_F_s;  // Vector of mat3d variables
+    mat3d m_F_curr;
+    mat3d m_F_prev;
     std::vector<double> m_J_s;
     std::vector<double> rhoR;
     std::vector<double> rho;

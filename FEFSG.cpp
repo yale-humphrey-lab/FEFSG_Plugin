@@ -55,6 +55,8 @@ void GRMaterialPoint::Init()
     rho_hat_h = 0.0;
     m_lambda_act = std::vector<double>(720, 0.0);  // Vector of zeros of length 720
     m_F_s = std::vector<mat3d>(720, mat3d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0));     // Vector of mat3d variables of length 720
+    m_F_curr = mat3d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+    m_F_prev = mat3d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
     m_J_s = std::vector<double>(720, 1.0);         // Vector of zeros of length 720
     rhoR = std::vector<double>(720, 0.0);         // Vector of zeros of length 720
     rho = std::vector<double>(720, 0.0);         // Vector of zeros of length 720
@@ -145,6 +147,7 @@ void GRMaterialPoint::Serialize(DumpStream& ar)
     ar & m_constituents;
     ar & m_lambda_act;
     ar & m_F_s;
+    ar & m_F_curr;
     ar & m_J_s;
     ar & rhoR;
     ar & rho;
@@ -182,7 +185,9 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
     sn = int(sn + dt);
 
     sigma_inv_curr = et.m_s_inv;
+    m_F_curr = m_F_prev;
     update_kinetics(sn);
+    update_sigma(sn);
     et.m_J_tar = m_J_s[sn];
 
 }
@@ -203,6 +208,7 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent,
     const double J = et.m_J;
     const double J_elem = et.m_J_elem;
     const int sn = pt.sn;
+    const mat3dd  I(1.0);
 
     // push deformation gradient to local coordinates
     mat3d Q = mat3d(e_r(mp), e_t(mp), e_z(mp));
@@ -211,30 +217,40 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent,
     pt.m_constituents[0].c1_alpha_h = 89.710*(1.0 - 0.595*m_a_val(mp));
 
     pt.m_F_s[sn] = Q.transpose() * et.m_F * Q;
+    pt.m_F_prev = F;
 
-    // calculate the stress as a sum of deviatoric stress and pressure
-    pt.update_sigma(sn);
 
-    mat3ds sbar = (Q * pt.m_sigma * Q.transpose()).sym();
+    mat3d F_star;
+    mat3ds E_star;
+    double J_star;
+    double F_star_det;;
+
+    tens4ds cbar = pt.m_CC.pp(Q);
+
+    J_star = et.m_J_tar/J;
+    F_star = F*pt.m_F_curr.inverse();
+    F_star_det = F_star.det();
+    E_star = 0.5*(pow(F_star_det/J_star, -2./3.)*(F_star.transpose()*F_star).sym() - mat3ds(I));
+
+    mat3ds sbar = (1./F_star_det) * (F_star *        Q * pt.m_sigma * Q.transpose()   * F_star.transpose()).sym()
+                + (1./F_star_det) * (F_star *       cbar.dot(E_star) * F_star.transpose()).sym();
+
+    //mat3ds sbar = (Q * pt.m_sigma * Q.transpose()).sym();
     stress = sbar.dev();
 
-    /*
     // Print m_F_curr to cout using printf
     printf("pt.m_sigma(1,1): %f\n",pt.m_sigma(1,1));
+    printf("pt.sbar(1,1): %f\n",sbar(1,1));
     printf("m_p: %f\n",et.m_p);
     printf("m_p_elem: %f\n",et.m_p_elem);
     printf("et.J_tar: %f\n",et.m_J_tar);
     printf("J_elem: %f\n",J_elem);
-    printf("J: %f\n",J);
+    printf("J_star: %f\n",1/J_star);
     // Optionally, add a newline for clarity
     printf("\n");
-    */
-
-    const mat3dd  I(1.0);
+    
     const tens4ds IxI = dyad1s(I);
     const tens4ds IoI = dyad4s(I);
-
-    tens4ds cbar = pt.m_CC.pp(Q);
 
     tangent = cbar - 1./3.*(ddots(cbar, IxI) - IxI*(cbar.tr()/3.))
     + 2./3.*((IoI-IxI/3.)*sbar.tr()-dyad1s(sbar.dev(),I));
