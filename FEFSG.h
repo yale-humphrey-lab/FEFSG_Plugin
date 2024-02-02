@@ -12,7 +12,7 @@
 //-----------------------------------------------------------------------------
 // We need to include this file since our new material class will inherit from
 // FEElasticMaterial which is defined in this include files.
-#include "FEBioMech/FEElasticMaterial.h"
+#include "FEBioMech/FEUncoupledMaterial.h"
 #include <FECore/FEModelParam.h>
 #include <iostream>								// to use cin.get()
 
@@ -198,16 +198,10 @@ public:
     double K_delta_sigma;
     double sigma_inv_h;
     double sigma_inv_curr;
-    std::vector<double> sigma_inv_hist;
     double rho_hat_h;
-    double m_J_curr;
-    double m_p_val_curr;
-    double m_p_val_prev;
     std::vector<GRConstituent> m_constituents;
     std::vector<double> m_lambda_act;
     std::vector<mat3d> m_F_s;  // Vector of mat3d variables
-    mat3d m_F_curr;  // Vector of mat3d variables
-    mat3d m_Q;  // Vector of mat3d variables
     std::vector<double> m_J_s;
     std::vector<double> rhoR;
     std::vector<double> rho;
@@ -230,7 +224,7 @@ public:
 // This material class implements a neo-Hookean constitutive model. 
 // Since it is a (compressible, coupled) hyper-elatic material, it needs to inherit
 // from FEElasticMaterial. 
-class FEFSG : public FEElasticMaterial
+class FEFSG : public FEUncoupledMaterial
 {
 public:
 	FEFSG(FEModel* pfem);
@@ -258,7 +252,7 @@ public:
 	// This function calculates the spatial (i.e. Cauchy or true) stress.
 	// It takes one parameter, the FEMaterialPoint and returns a mat3ds object
 	// which is a symmetric second-order tensor.
-	virtual mat3ds Stress(FEMaterialPoint& pt) override {
+	virtual mat3ds DevStress(FEMaterialPoint& pt) override {
 		mat3ds stress;
 		tens4ds tangent;
 		StressTangent(pt, stress, tangent, 1);
@@ -268,7 +262,7 @@ public:
 	// This function calculates the spatial elasticity tangent tensor. 
 	// It takes one parameter, the FEMaterialPoint and retursn a tens4ds object
 	// which is a fourth-order tensor with major and minor symmetries.
-	virtual tens4ds Tangent(FEMaterialPoint& pt) override {
+	virtual tens4ds DevTangent(FEMaterialPoint& pt) override {
 		mat3ds stress;
 		tens4ds tangent;
 		StressTangent(pt, stress, tangent, 0);
@@ -276,44 +270,6 @@ public:
 	};
 
 public:
-    // TODO: removing virtual from the following 3 functions causes changes
-    // to the convergence criteria on macOS, despite these functions not
-    // being overridden anywhere.
-	//! strain energy density U(J)
-    virtual double U(double J, double J_tar) {
-        switch (m_npmodel) {
-            case 0: return 0.5*m_K*pow(log(J/J_tar),2); break;    // FEBio default
-            case 1: return 0.25*m_K*(J/J_tar*J/J_tar - 2.0*log(J/J_tar) - 1.0); break;    // NIKE3D's Ogden material
-            case 2: return 0.5*m_K*(J/J_tar-1)*(J/J_tar-1); break;      // ABAQUS
-            case 3: return 0.5*m_K*((J/J_tar*J/J_tar-1)/2-log(J/J_tar)); break;      // ABAQUS - GOH
-            default: { assert(false); return 0; }
-        }
-    }
-	//! pressure, i.e. first derivative of U(J)
-	virtual double UJ(double J, double J_tar) {
-        switch (m_npmodel) {
-            case 0: return m_K*log(J/J_tar)/J; break;
-            case 1: return 0.5*m_K*(J/(J_tar*J_tar) - 1.0/J); break;
-            case 2: return m_K*(J/J_tar-1); break;
-            case 3: return 0.5*m_K*(J/(J_tar*J_tar)-1.0/J); break;
-			default: { assert(false); return 0; }
-		}
-    }
-
-	//! second derivative of U(J) 
-	virtual double UJJ(double J, double J_tar) {
-        switch (m_npmodel) {
-            case 0: return m_K*(1-log(J/J_tar))/(J*J); break;
-            case 1: return 0.5*m_K*(1/(J_tar*J_tar) + 1.0/(J*J)); break;
-            case 2: return m_K/J_tar; break;
-            case 3: return 0.5*m_K*(1/(J_tar*J_tar) + 1.0/(J*J)); break;
-			default: { assert(false); return 0; }
-		}
-    }
-
-public:
-	double	m_K;			//!< bulk modulus
-	int     m_npmodel;      //!< pressure model for U(J)
 	FEParamVec3     e_r;      //
 	FEParamVec3     e_t;      //
 	FEParamVec3     e_z;      //

@@ -1,23 +1,21 @@
 //#include "stdafx.h"
 #include "FEFSG.h"
-#include "FEBioMech/FEElasticMaterial.h"
-#include "FECore/FEAnalysis.h"					// to get end time
-#include "FECore/FEModel.h"						// to get current time
-#include "FECore/log.h"							// to print to log file and/or screen
-#include <iostream>								// to use cin.get()
+#include "FEBioMech/FEUncoupledMaterial.h"
+#include "FECore/FEAnalysis.h"                  // to get end time
+#include "FECore/FEModel.h"                     // to get current time
+#include "FECore/log.h"                         // to print to log file and/or screen
+#include <iostream>                             // to use cin.get()
 #include <sstream>
 #include <signal.h>
-#define _USE_MATH_DEFINES						// to introduce pi constant (1/2)
-#include <math.h>								// to introduce pi constant (2/2)
+#define _USE_MATH_DEFINES                       // to introduce pi constant (1/2)
+#include <math.h>                               // to introduce pi constant (2/2)
 #include <limits>
 #include <fstream>
 #include <algorithm>  // Include for std::count
 #include <iterator>   // Include for std::istreambuf_iterator
 
 // define the material parameters
-BEGIN_FECORE_CLASS(FEFSG, FEElasticMaterial)
-    ADD_PARAMETER(m_K      , FE_RANGE_GREATER_OR_EQUAL(0.0), "k")->setUnits(UNIT_PRESSURE)->MakeTopLevel(true)->setLongName("bulk modulus");
-    ADD_PARAMETER(m_npmodel, "pressure_model")->setEnums("default\0NIKE3D\0Abaqus\0Abaqus (GOH)\0")->MakeTopLevel(true);
+BEGIN_FECORE_CLASS(FEFSG, FEUncoupledMaterial)
     ADD_PARAMETER(m_a_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "a_val");
     ADD_PARAMETER(e_r , "e_r");
     ADD_PARAMETER(e_t , "e_t");
@@ -25,7 +23,7 @@ BEGIN_FECORE_CLASS(FEFSG, FEElasticMaterial)
 END_FECORE_CLASS();
 
 // define the material parameters
-FEFSG::FEFSG(FEModel* pfem) : FEElasticMaterial(pfem)
+FEFSG::FEFSG(FEModel* pfem) : FEUncoupledMaterial(pfem)
 {
     m_K = 0;    // invalid value!
     m_npmodel = 0;
@@ -38,7 +36,7 @@ FEFSG::FEFSG(FEModel* pfem) : FEElasticMaterial(pfem)
 
 FEMaterialPointData* GRMaterialPoint::Copy()
 {
-	GRMaterialPoint* pt = new GRMaterialPoint(*this);
+    GRMaterialPoint* pt = new GRMaterialPoint(*this);
     if (m_pNext) pt->m_pNext = m_pNext->Copy();
     return pt;
 }
@@ -47,7 +45,6 @@ void GRMaterialPoint::Init()
 {
     FEMaterialPointData::Init();
 
-    m_J_curr = 1.0;
     m_dt = 1.0;
     nts = 720;
     sn = 0;
@@ -55,12 +52,9 @@ void GRMaterialPoint::Init()
     K_delta_sigma = 0.0;
     sigma_inv_h = 0.0;
     sigma_inv_curr = 0.0;
-    sigma_inv_hist = std::vector<double>(720, 0.0);  // Vector of zeros of length 720
     rho_hat_h = 0.0;
     m_lambda_act = std::vector<double>(720, 0.0);  // Vector of zeros of length 720
     m_F_s = std::vector<mat3d>(720, mat3d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0));     // Vector of mat3d variables of length 720
-    m_F_curr = mat3d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
-    m_Q = mat3d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
     m_J_s = std::vector<double>(720, 1.0);         // Vector of zeros of length 720
     rhoR = std::vector<double>(720, 0.0);         // Vector of zeros of length 720
     rho = std::vector<double>(720, 0.0);         // Vector of zeros of length 720
@@ -76,9 +70,6 @@ void GRMaterialPoint::Init()
     k_act = 0.0;
     m_sigma = mat3ds(0.0);
     m_CC = tens4ds(0.0);
-
-    m_p_val_curr = 0;
-    m_p_val_prev = 0;
 
 
     // Hardcoded filename as a string variable
@@ -154,8 +145,6 @@ void GRMaterialPoint::Serialize(DumpStream& ar)
     ar & m_constituents;
     ar & m_lambda_act;
     ar & m_F_s;
-    ar & m_F_curr;
-    ar & m_Q;
     ar & m_J_s;
     ar & rhoR;
     ar & rho;
@@ -178,109 +167,76 @@ FEMaterialPointData* FEFSG::CreateMaterialPointData()
     return new GRMaterialPoint(new FEElasticMaterialPoint); 
 }
 
-
 //! Update material point data.
 void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
 {
-
 
     FEElasticMaterialPoint& et = *(this->ExtractData<FEElasticMaterialPoint>());
 
     // get current and end times
     const double t = timeInfo.currentTime;
     const double dt = timeInfo.timeIncrement;
+    //printf("--------------------------------\n");
+    //fflush(stdout);
 
     sn = int(sn + dt);
 
     sigma_inv_curr = et.m_s_inv;
-
-    m_F_s[sn] = m_Q.transpose() * et.m_F * m_Q;
-    m_F_curr = et.m_F;
-
     update_kinetics(sn);
-    update_sigma(sn);
-
-    m_p_val_prev = et.m_p_elem; //m_p_val_curr;
-    m_J_curr = m_J_s[sn];
+    et.m_J_tar = m_J_s[sn];
 
 }
 
-
-
 void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent, int call_type)
-{		
-	// The FEMaterialPoint classes are stored in a linked list. The specific material
-	// point data needed by this function can be accessed using the ExtractData member.
-	// In this case, we want to FEElasticMaterialPoint data since it stores the deformation
-	// information that is needed to evaluate the stress.
-	FEElasticMaterialPoint& et = *mp.ExtractData<FEElasticMaterialPoint>();
-	GRMaterialPoint& pt = *mp.ExtractData<GRMaterialPoint>();
+{       
+    // The FEMaterialPoint classes are stored in a linked list. The specific material
+    // point data needed by this function can be accessed using the ExtractData member.
+    // In this case, we want to FEElasticMaterialPoint data since it stores the deformation
+    // information that is needed to evaluate the stress.
+    FEElasticMaterialPoint& et = *mp.ExtractData<FEElasticMaterialPoint>();
+    GRMaterialPoint& pt = *mp.ExtractData<GRMaterialPoint>();
 
-	// We'll need the deformation gradient and its determinant in this function.
-	// Note that we don't take the determinant of F directly (using mat3d::det)
-	// but instead use the m_J member variable of FEMaterialPoint.
-	const mat3d &F = et.m_F;
-	const double J = et.m_J;
+    // We'll need the deformation gradient and its determinant in this function.
+    // Note that we don't take the determinant of F directly (using mat3d::det)
+    // but instead use the m_J member variable of FEMaterialPoint.
+    const mat3d &F = et.m_F;
+    const double J = et.m_J;
     const double J_elem = et.m_J_elem;
-	const int sn = pt.sn;
+    const int sn = pt.sn;
 
-    const mat3dd  I(1.0);
+    // push deformation gradient to local coordinates
+    mat3d Q = mat3d(e_r(mp), e_t(mp), e_z(mp));
 
-    mat3d F_star;
-    mat3ds E_star;
-    mat3ds C_star;
-    double J_star;
-    double F_star_det;
-
-    pt.m_Q = mat3d(e_r(mp), e_t(mp), e_z(mp));
     pt.K_delta_sigma = 0.184*m_a_val(mp);
     pt.m_constituents[0].c1_alpha_h = 89.710*(1.0 - 0.595*m_a_val(mp));
 
-    tens4ds cbar = pt.m_CC.pp(pt.m_Q);
-    mat3d F_curr = pt.m_F_curr;
+    pt.m_F_s[sn] = Q.transpose() * et.m_F * Q;
 
-    J_star = pt.m_J_curr/F_curr.det();
+    // calculate the stress as a sum of deviatoric stress and pressure
+    pt.update_sigma(sn);
 
-    F_star = F*F_curr.inverse();
-
-    F_star_det = F_star.det();
-
-    C_star = (F_star.transpose()*F_star).sym();
-
-    E_star = 0.5*(pow(F_star_det/J_star, -2./3.)*C_star - mat3ds(I));
-
-    mat3ds sbar = (1./F_star_det) * (F_star *        pt.m_Q * pt.m_sigma * pt.m_Q.transpose()   * F_star.transpose()).sym()
-                + (1./F_star_det) * (F_star *       cbar.dot(E_star) * F_star.transpose()).sym();
-
-    double p_val = pt.m_p_val_prev + UJ(F_star_det, J_star);
-
-    et.m_p = p_val;
-    pt.m_p_val_curr = p_val;
-
-    stress = mat3dd(p_val) + sbar.dev();
+    mat3ds sbar = (Q * pt.m_sigma * Q.transpose()).sym();
+    stress = sbar.dev();
 
     /*
     // Print m_F_curr to cout using printf
-    printf("s_inv: %f\n",stress.tr());
     printf("pt.m_sigma(1,1): %f\n",pt.m_sigma(1,1));
-    printf("F_star_det: %f\n",F_star_det);
-    printf("J_star: %f\n",J_star);
-    printf("pt.m_J_curr: %f\n",J_star);
-    printf("UJ(F_star_det, J_star): %f\n",UJ(F_star_det, J_star));
     printf("m_p: %f\n",et.m_p);
     printf("m_p_elem: %f\n",et.m_p_elem);
+    printf("et.J_tar: %f\n",et.m_J_tar);
     printf("J_elem: %f\n",J_elem);
     printf("J: %f\n",J);
     // Optionally, add a newline for clarity
     printf("\n");
     */
 
-	const tens4ds IxI = dyad1s(I);
-	const tens4ds IoI = dyad4s(I);
+    const mat3dd  I(1.0);
+    const tens4ds IxI = dyad1s(I);
+    const tens4ds IoI = dyad4s(I);
 
-    //cbar = pow(F_star_det/J_star, -4./3.) * cbar;
+    tens4ds cbar = pt.m_CC.pp(Q);
 
-    tens4ds dev_tangent = cbar - 1./3.*(ddots(cbar, IxI) - IxI*(cbar.tr()/3.))
+    tangent = cbar - 1./3.*(ddots(cbar, IxI) - IxI*(cbar.tr()/3.))
     + 2./3.*((IoI-IxI/3.)*sbar.tr()-dyad1s(sbar.dev(),I));
 
     // tangent is sum of three terms
@@ -294,23 +250,16 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent,
     // but we do need to add it here.
     //
     //        c_tilde         c_pressure            c_k
-    tangent = dev_tangent + (IxI - IoI*2)*p_val + IxI*(UJJ(F_star_det, J_star)*J);
-
+    //tangent = dev_tangent + (IxI - IoI*2)*p_val + IxI*(UJJ(J, pt.m_J_curr)*J);
 
     // Write outputs to unused velocity and acceleration vectors for writeout
     // TODO: confirm what "stiffness" means in this context
-    et.m_v.x = pt.m_J_curr;                             // Target volume
+    et.m_v.x = et.m_J_tar;                             // Target volume
     et.m_v.y = m_a_val(mp);                             // Aneurysm injury
     et.m_v.z = pt.m_constituents[0].rhoR_alpha[sn];     // Generally, elasticity density
-
-    et.m_a.x = pt.m_constituents[1].rhoR_alpha[sn] ;     // Radial stiffness
-    et.m_a.y = pt.m_constituents[2].rhoR_alpha[sn];     // Circumfrential stiffness
-    et.m_a.z = pt.m_constituents[3].rhoR_alpha[sn];     // Axial stiffness
-
-
-    //et.m_a.x = pt.m_CC(0,0,0,0);     // Radial stiffness
-    //et.m_a.y = pt.m_CC(1,1,1,1);     // Circumfrential stiffness
-    //et.m_a.z = pt.m_CC(2,2,2,2);     // Axial stiffness
+    et.m_a.x = pt.m_CC(0,0,0,0);     // Radial stiffness
+    et.m_a.y = pt.m_CC(1,1,1,1);     // Circumfrential stiffness
+    et.m_a.z = pt.m_CC(2,2,2,2);     // Axial stiffness
 
 
 }
@@ -326,7 +275,7 @@ void GRMaterialPoint::update_kinetics(int sn) {
     double delta_sigma = ((1 - K_delta_sigma) * (sigma_inv_curr / sigma_inv_h)) - 1;
     //Wall shear stress
     //TODO implement shear stress
-    double delta_tauw = 0;
+    double delta_tauw = 1;
 
     //Initialize pars for looping later
     double K_sigma_p = 0, K_tauw_p = 0, K_sigma_d = 0, K_tauw_d = 0;
@@ -345,14 +294,6 @@ void GRMaterialPoint::update_kinetics(int sn) {
     int n = 0; //number of points in integration interval
 
     n = (sn - taun_min) + 1; //find number of integration pts
-
-    /*
-    printf("\nsn: %d\n", sn);
-    printf("delta_sigma: %f\n", delta_sigma);
-    printf("K_delta_sigma: %f\n", K_delta_sigma);
-    printf("sigma_inv_curr: %f\n", sigma_inv_curr);
-    printf("sigma_inv_h: %f\n", sigma_inv_h);
-    */
 
     //Loop through each constituent to update its mass density
     for (GRConstituent& constituent : m_constituents) {
@@ -472,10 +413,10 @@ void GRMaterialPoint::update_sigma(int sn) {
 
     //Find the current deformation gradient
     mat3d F_s = m_F_s[sn];
-    double J_s = F_s.det();
+    double J_s = m_J_s[sn];
 
-	// compute U from polar decomposition of deformation gradient tensor
-	mat3ds U; mat3d R; F_s.right_polar(R,U);
+    // compute U from polar decomposition of deformation gradient tensor
+    mat3ds U; mat3d R; F_s.right_polar(R,U);
     mat3ds U_tau; mat3d R_tau;
 
     // TODO: Consider initializing from passed value? bc of special
@@ -551,7 +492,7 @@ void GRMaterialPoint::update_sigma(int sn) {
 
     for (GRConstituent& constituent : m_constituents) {
 
-    	alpha_count = alpha_count + 1;
+        alpha_count = alpha_count + 1;
 
         //Trapz rule allows for fast heredity integral evaluation
         k_2 = constituent.k_alpha[sn];
@@ -570,8 +511,8 @@ void GRMaterialPoint::update_sigma(int sn) {
 
         G_alpha_h = constituent.G_alpha_h;
 
-		// compute U from polar decomposition of deformation gradient tensor
-		F_tau.right_polar(R_tau,U_tau);
+        // compute U from polar decomposition of deformation gradient tensor
+        F_tau.right_polar(R_tau,U_tau);
         G_alpha_h_N = G_alpha_h * R_tau;
 
         constitutive_return = constituent.constitutive(sn, sn);
@@ -581,7 +522,7 @@ void GRMaterialPoint::update_sigma(int sn) {
         F_alpha_ntau_s = F_s*F_tau.inverse()*G_alpha_h_N;
 
         hat_sigma_2 = 1.0/J_s * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
-		hat_CC_2 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11.pp(F_alpha_ntau_s);
+        hat_CC_2 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11.pp(F_alpha_ntau_s);
 
 
         //Check if during G&R or at initial time point
@@ -590,8 +531,8 @@ void GRMaterialPoint::update_sigma(int sn) {
             for (int taun = sn - 1; taun >= taun_min; taun = taun - 1) {
 
                 F_tau = m_F_s[taun];
-                J_tau = F_tau.det();
-				F_tau.right_polar(R_tau,U_tau);
+                J_tau = m_J_s[taun];
+                F_tau.right_polar(R_tau,U_tau);
                 G_alpha_h_N = G_alpha_h*R_tau;
 
                 //Find 1st intermediate kinetics
@@ -611,11 +552,11 @@ void GRMaterialPoint::update_sigma(int sn) {
                 F_alpha_ntau_s = F_s*F_tau.inverse()*G_alpha_h_N;
 
                 hat_sigma_1 = 1.0 / J_s * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
-				hat_CC_1 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11.pp(F_alpha_ntau_s);
+                hat_CC_1 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11.pp(F_alpha_ntau_s);
 
 
-				// Add integration contribution
-				sigma += (mq_2 * hat_sigma_2 + mq_1 * hat_sigma_1) / constituent.rho_hat_alpha_h * m_dt / 2;
+                // Add integration contribution
+                sigma += (mq_2 * hat_sigma_2 + mq_1 * hat_sigma_1) / constituent.rho_hat_alpha_h * m_dt / 2;
                 CC += (mq_2 * hat_CC_2 + mq_1 * hat_CC_1) / constituent.rho_hat_alpha_h * m_dt / 2;
 
                 //Store active vars for next iteration
@@ -641,11 +582,11 @@ void GRMaterialPoint::update_sigma(int sn) {
 
             // Add in the stress and stiffness contributions of the initial material
             if (taun_min == 0) {
-	            sigma += constituent.rhoR_alpha[0]
-	                / constituent.rho_hat_alpha_h * q_1 * hat_sigma_1;
+                sigma += constituent.rhoR_alpha[0]
+                    / constituent.rho_hat_alpha_h * q_1 * hat_sigma_1;
 
-	            CC += constituent.rhoR_alpha[0]
-	                / constituent.rho_hat_alpha_h * q_1 * hat_CC_1;
+                CC += constituent.rhoR_alpha[0]
+                    / constituent.rho_hat_alpha_h * q_1 * hat_CC_1;
             }
 
         }
@@ -661,7 +602,7 @@ void GRMaterialPoint::update_sigma(int sn) {
             //Check if anisotropic
             hat_sigma_2 = 1.0/J_s * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
 
-			hat_CC_2 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11.pp(F_alpha_ntau_s);
+            hat_CC_2 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11.pp(F_alpha_ntau_s);
 
             // Add in stress and stiffness contributions
             sigma += constituent.rhoR_alpha[sn] /
@@ -682,44 +623,43 @@ void GRMaterialPoint::update_sigma(int sn) {
 
         if (constituent.m_active == 1) {
         
-		    //Find active stress contribtion
-		    //add in initial active stress radius contribution
-		    C = CB - CS * (bar_tauw_curr / bar_tauw_h - 1);
+            //Find active stress contribtion
+            //add in initial active stress radius contribution
+            C = CB - CS * (bar_tauw_curr / bar_tauw_h - 1);
 
-		    if (sn == 0) {
-		        C = CB;
-		        lambda_act = 1.0;
-		    }
+            if (sn == 0) {
+                C = CB;
+                lambda_act = 1.0;
+            }
 
-		    parab_act = 1 - pow((lambda_m - lambda_act) / (lambda_m - lambda_0), 2);
+            parab_act = 1 - pow((lambda_m - lambda_act) / (lambda_m - lambda_0), 2);
 
-		    S_act = T_act * (1 - exp(-pow(C, 2))) * pow(lambda_act, -1) * parab_act *
-		            constituent.rhoR_alpha[sn] / constituent.rho_hat_alpha_h;
-
-
-		    dSdC_act = T_act *  (1 - exp(-pow(C, 2))) * (1/lambda_act) *
-		               ((-1/pow(lambda_act,2))*parab_act + 2*(1/lambda_act)*(lambda_m - lambda_act)/ pow(lambda_m - lambda_0, 2)) *
-		               constituent.rhoR_alpha[sn] / constituent.rho_hat_alpha_h;
+            S_act = T_act * (1 - exp(-pow(C, 2))) * pow(lambda_act, -1) * parab_act *
+                    constituent.rhoR_alpha[sn] / constituent.rho_hat_alpha_h;
 
 
-		    sigma_act_mat = 1.0/J_s * (F_s * mat3dd(0,1,0) * F_s.transpose()).sym();
-			//TODO : Check this
+            dSdC_act = T_act *  (1 - exp(-pow(C, 2))) * (1/lambda_act) *
+                       ((-1/pow(lambda_act,2))*parab_act + 2*(1/lambda_act)*(lambda_m - lambda_act)/ pow(lambda_m - lambda_0, 2)) *
+                       constituent.rhoR_alpha[sn] / constituent.rho_hat_alpha_h;
+
+
+            sigma_act_mat = 1.0/J_s * (F_s * mat3dd(0,1,0) * F_s.transpose()).sym();
+            //TODO : Check this
 
             CC_act_mat = tens4ds(0.0);
             CC_act_mat(1,1,1,1) = hat_dS_dlambda2_alpha;
-			CC_act_mat = 1.0 / J_s * CC_act_mat.pp(F_s);
+            CC_act_mat = 1.0 / J_s * CC_act_mat.pp(F_s);
 
-		    sigma += sigma_act_mat;
-			CC += CC_act_mat;
+            sigma += sigma_act_mat;
+            CC += CC_act_mat;
 
         }
 
     }
 
-	m_sigma = sigma;
-	m_CC = CC;
+    m_sigma = sigma;
+    m_CC = CC;
 
     return;
 }
-
 
