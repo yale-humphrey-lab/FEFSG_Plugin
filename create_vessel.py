@@ -9,7 +9,7 @@ def update_geometry(xml_file_path, xml_items):
     root = tree.getroot()
 
     # Find the Geometry tag
-    geometry_tag = root.find(".//Geometry")
+    geometry_tag = root.find(".//Mesh")
 
     # Remove existing content under Geometry tag
     geometry_tag.clear()
@@ -74,13 +74,13 @@ def getGeometry():
     print("Initializing cylindrical vessel...")
 
     numCirc = 24 #Must be divisible by 4!
-    numLen = 12
+    numLen = 1
     numRad = 1
     radius = 6.468e-01
     thickness = 4.02e-02
-    length = 6.468e-01*2
-    half = False
-    quarter = True
+    length = 4.02e-02
+    half = True
+    quarter = False
     linear = False
 
     if linear == False:
@@ -266,16 +266,16 @@ def getGeometry():
     # Write Surfaces
     xml_object = ''
     xml_object += '\t<NodeSet name="FixXs">\n'
-    for i, node in enumerate(fix_x, start=1):
-        xml_object += f'\t\t<node id="{node}"/>\n'
+    result_string = ', '.join(str(x) for x in fix_x)
+    xml_object += f'\t\t{result_string}\n'
     xml_object += '\t</NodeSet>\n'
     xml_content.append(ET.fromstring(xml_object))
 
 
     xml_object = ''
     xml_object += '\t<NodeSet name="FixYs">\n'
-    for i, node in enumerate(fix_y, start=1):
-        xml_object += f'\t\t<node id="{node}"/>\n'
+    result_string = ', '.join(str(x) for x in fix_y)
+    xml_object += f'\t\t{result_string}\n'
     xml_object += '\t</NodeSet>\n'
     xml_content.append(ET.fromstring(xml_object))
 

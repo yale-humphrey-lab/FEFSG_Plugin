@@ -134,20 +134,6 @@ public:
 	        hat_S_alpha =  c1_alpha_h * Q1 * exp(Q2);
 	        hat_dS_dlambda2_alpha =  c1_alpha_h * exp(Q2) * (1 + 2 * Q2);
 
-	        /*
-			printf("sn: %d\n", sn);
-			printf("ts: %d\n", ts);
-			printf("g_alpha_h: %f\n", g_alpha_h);
-			printf("lambda_alpha_tau[sn]: %f\n", lambda_alpha_tau[sn]);
-			printf("lambda_alpha_tau[ts]: %f\n", lambda_alpha_tau[ts]);
-			printf("lambda_alpha_ntau_s: %f\n", lambda_alpha_ntau_s);
-			printf("Q1: %f\n", Q1);
-			printf("Q2: %f\n", Q2);
-			printf("hat_S_alpha: %f\n", hat_S_alpha);
-			printf("hat_dS_dlambda2_alpha: %f\n", hat_dS_dlambda2_alpha);
-			fflush(stdout);
-			*/
-
 	    }
 	    else {
 
@@ -249,26 +235,26 @@ public:
 
 public:
 	// function to perform material evaluation. calculates stress and tangent to avoid code duplication
-	void StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent, int call_type);
+	void DevStressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent);
 
 	// This function calculates the spatial (i.e. Cauchy or true) stress.
 	// It takes one parameter, the FEMaterialPoint and returns a mat3ds object
 	// which is a symmetric second-order tensor.
 	virtual mat3ds DevStress(FEMaterialPoint& pt) override {
-		mat3ds stress;
-		tens4ds tangent;
-		StressTangent(pt, stress, tangent, 1);
-		return stress;
+		mat3ds devstress;
+		tens4ds devtangent;
+		DevStressTangent(pt, devstress, devtangent);
+		return devstress;
 	}
 
 	// This function calculates the spatial elasticity tangent tensor. 
 	// It takes one parameter, the FEMaterialPoint and retursn a tens4ds object
 	// which is a fourth-order tensor with major and minor symmetries.
 	virtual tens4ds DevTangent(FEMaterialPoint& pt) override {
-		mat3ds stress;
-		tens4ds tangent;
-		StressTangent(pt, stress, tangent, 0);
-		return tangent;
+		mat3ds devstress;
+		tens4ds devtangent;
+		DevStressTangent(pt, devstress, devtangent);
+		return devtangent;
 	};
 
 public:

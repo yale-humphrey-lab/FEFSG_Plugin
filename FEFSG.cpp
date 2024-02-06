@@ -184,15 +184,15 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
 
     sn = int(sn + dt);
 
-    sigma_inv_curr = et.m_s_inv;
+    sigma_inv_curr = et.m_s.tr();
     m_F_curr = m_F_prev;
     update_kinetics(sn);
     update_sigma(sn);
-    et.m_J_tar = m_J_s[sn];
+    et.m_J_star = m_J_s[sn];
 
 }
 
-void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent, int call_type)
+void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& devtangent)
 {       
     // The FEMaterialPoint classes are stored in a linked list. The specific material
     // point data needed by this function can be accessed using the ExtractData member.
@@ -206,54 +206,45 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent,
     // but instead use the m_J member variable of FEMaterialPoint.
     const mat3d &F = et.m_F;
     const double J = et.m_J;
-    const double J_elem = et.m_J_elem;
     const int sn = pt.sn;
-    const mat3dd  I(1.0);
 
     // push deformation gradient to local coordinates
     mat3d Q = mat3d(e_r(mp), e_t(mp), e_z(mp));
-
     pt.K_delta_sigma = 0.184*m_a_val(mp);
     pt.m_constituents[0].c1_alpha_h = 89.710*(1.0 - 0.595*m_a_val(mp));
 
     pt.m_F_s[sn] = Q.transpose() * et.m_F * Q;
-    pt.m_F_prev = F;
 
+    // calculate the stress as a sum of deviatoric stress and pressure
+    pt.update_sigma(sn);
 
-    mat3d F_star;
-    mat3ds E_star;
-    double J_star;
-    double F_star_det;;
+    mat3ds sbar = pow(J / et.m_J_star, -2.0 / 3.0)*(Q * pt.m_sigma * Q.transpose()).sym();
 
-    tens4ds cbar = pt.m_CC.pp(Q);
+    devstress = sbar.dev();
 
-    J_star = et.m_J_tar/J;
-    F_star = F*pt.m_F_curr.inverse();
-    F_star_det = F_star.det();
-    E_star = 0.5*(pow(F_star_det/J_star, -2./3.)*(F_star.transpose()*F_star).sym() - mat3ds(I));
-
-    mat3ds sbar = (1./F_star_det) * (F_star *        Q * pt.m_sigma * Q.transpose()   * F_star.transpose()).sym()
-                + (1./F_star_det) * (F_star *       cbar.dot(E_star) * F_star.transpose()).sym();
-
-    //mat3ds sbar = (Q * pt.m_sigma * Q.transpose()).sym();
-    stress = sbar.dev();
-
-    // Print m_F_curr to cout using printf
-    printf("pt.m_sigma(1,1): %f\n",pt.m_sigma(1,1));
-    printf("pt.sbar(1,1): %f\n",sbar(1,1));
-    printf("m_p: %f\n",et.m_p);
-    printf("m_p_elem: %f\n",et.m_p_elem);
-    printf("et.J_tar: %f\n",et.m_J_tar);
-    printf("J_elem: %f\n",J_elem);
-    printf("J_star: %f\n",1/J_star);
-    // Optionally, add a newline for clarity
-    printf("\n");
-    
+    const mat3dd  I(1.0);
     const tens4ds IxI = dyad1s(I);
     const tens4ds IoI = dyad4s(I);
 
-    tangent = cbar - 1./3.*(ddots(cbar, IxI) - IxI*(cbar.tr()/3.))
+    tens4ds cbar = pow(J / et.m_J_star, -4.0 / 3.0)*pt.m_CC.pp(Q);
+
+    devtangent = cbar - 1./3.*(ddots(cbar, IxI) - IxI*(cbar.tr()/3.))
     + 2./3.*((IoI-IxI/3.)*sbar.tr()-dyad1s(sbar.dev(),I));
+
+    /*
+    printf("J_s: %f\n", pt.m_J_s[sn]);
+
+    printf("sigma: \n");
+    // Initialize the matrix with some values
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            printf("%f ", pt.m_sigma(i,j));
+        }
+        printf("\n");
+    }
+    printf("\n");
+    */
+
 
     // tangent is sum of three terms
     // C = c_tilde + c_pressure + c_k
@@ -270,7 +261,8 @@ void FEFSG::StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent,
 
     // Write outputs to unused velocity and acceleration vectors for writeout
     // TODO: confirm what "stiffness" means in this context
-    et.m_v.x = et.m_J_tar;                             // Target volume
+
+    et.m_v.x = pt.m_J_s[sn];                             // Target volume
     et.m_v.y = m_a_val(mp);                             // Aneurysm injury
     et.m_v.z = pt.m_constituents[0].rhoR_alpha[sn];     // Generally, elasticity density
     et.m_a.x = pt.m_CC(0,0,0,0);     // Radial stiffness
@@ -429,7 +421,7 @@ void GRMaterialPoint::update_sigma(int sn) {
 
     //Find the current deformation gradient
     mat3d F_s = m_F_s[sn];
-    double J_s = m_J_s[sn];
+    double J_s = F_s.det(); //m_J_s[sn];
 
     // compute U from polar decomposition of deformation gradient tensor
     mat3ds U; mat3d R; F_s.right_polar(R,U);
@@ -547,7 +539,7 @@ void GRMaterialPoint::update_sigma(int sn) {
             for (int taun = sn - 1; taun >= taun_min; taun = taun - 1) {
 
                 F_tau = m_F_s[taun];
-                J_tau = m_J_s[taun];
+                J_tau = F_tau.det(); //m_J_s[taun];
                 F_tau.right_polar(R_tau,U_tau);
                 G_alpha_h_N = G_alpha_h*R_tau;
 
