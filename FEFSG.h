@@ -18,6 +18,8 @@
 
 class GRConstituent {
 public:
+	enum { MAX_TIMESTEPS = 720 };
+
     double epsilon_pol_min;
     double eta_alpha_h;
     double c1_alpha_h;
@@ -27,12 +29,12 @@ public:
     double k_alpha_h;
     double rho_hat_alpha_h;
     double rhoR_alpha_h;
-    std::vector<double> mR_alpha;
-    std::vector<double> k_alpha;
-    std::vector<double> rhoR_alpha;
-    std::vector<double> epsilonR_alpha;
-    std::vector<double> lambda_alpha_tau;
-    std::vector<double> epsilon_alpha;
+    double mR_alpha[MAX_TIMESTEPS];
+    double k_alpha[MAX_TIMESTEPS];
+    double rhoR_alpha[MAX_TIMESTEPS];
+    double epsilonR_alpha[MAX_TIMESTEPS];
+    double lambda_alpha_tau[MAX_TIMESTEPS];
+    double epsilon_alpha[MAX_TIMESTEPS];
     double K_sigma_p_alpha_h;
     double K_tauw_p_alpha_h;
     double K_sigma_d_alpha_h;
@@ -64,12 +66,18 @@ public:
         k_alpha_h = 0.0;
         rho_hat_alpha_h = 0.0;
         rhoR_alpha_h = 0.0;
-        mR_alpha = std::vector<double>(720, 0.0);  // Vector of zeros of length 720
-        k_alpha = std::vector<double>(720, 0.0);   // Vector of zeros of length 720
-        rhoR_alpha = std::vector<double>(720, 0.0); // Vector of zeros of length 720
-        epsilonR_alpha = std::vector<double>(720, 0.0);  // Vector of zeros of length 720
-        epsilon_alpha = std::vector<double>(720, 0.0);  // Vector of zeros of length 720
-        lambda_alpha_tau = std::vector<double>(720, 1.0);  // Vector of zeros of length 720
+
+
+		for (int i=0; i<MAX_TIMESTEPS; ++i)
+		{
+	        mR_alpha[i] = 0;
+	        k_alpha[i] = 0;
+	        rhoR_alpha[i] = 0;
+	        epsilonR_alpha[i] = 0;
+	        epsilon_alpha[i] = 0;
+	        lambda_alpha_tau[i] = 1;
+		}
+
         K_sigma_p_alpha_h = 0.0;
         K_tauw_p_alpha_h = 0.0;
         K_sigma_d_alpha_h = 0.0;
@@ -179,24 +187,28 @@ public:
 	void update_sigma(int sn);
 	void update_kinetics(int sn);
 
+	enum { MAX_TIMESTEPS = 720 };
+	enum { MAX_CONSTITUENTS = 6 };
+
 
 public:
     int nts;
     int sn;
+    double m_nconstituents;
     double m_dt;
     double K_delta_tauw;
     double K_delta_sigma;
     double sigma_inv_h;
     double sigma_inv_curr;
     double rho_hat_h;
-    std::vector<GRConstituent> m_constituents;
-    std::vector<double> m_lambda_act;
-    std::vector<mat3d> m_F_s;
-    std::vector<double> m_J_s;
-    std::vector<double> rhoR;
-    std::vector<double> rho;
-    std::vector<double> ups_infl_p;
-    std::vector<double> ups_infl_d;
+    GRConstituent m_constituents[MAX_CONSTITUENTS];
+    double m_lambda_act[MAX_TIMESTEPS];
+    mat3d  m_F_s[MAX_TIMESTEPS];
+    double m_J_s[MAX_TIMESTEPS];
+    double rhoR[MAX_TIMESTEPS];
+    double rho[MAX_TIMESTEPS];
+    double ups_infl_p[MAX_TIMESTEPS];
+    double ups_infl_d[MAX_TIMESTEPS];
     double CB;
     double CS;
     double bar_tauw_curr;
