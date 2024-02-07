@@ -55,8 +55,6 @@ void GRMaterialPoint::Init()
     rho_hat_h = 0.0;
     m_lambda_act = std::vector<double>(720, 0.0);  // Vector of zeros of length 720
     m_F_s = std::vector<mat3d>(720, mat3d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0));     // Vector of mat3d variables of length 720
-    m_F_curr = mat3d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
-    m_F_prev = mat3d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
     m_J_s = std::vector<double>(720, 1.0);         // Vector of zeros of length 720
     rhoR = std::vector<double>(720, 0.0);         // Vector of zeros of length 720
     rho = std::vector<double>(720, 0.0);         // Vector of zeros of length 720
@@ -139,29 +137,33 @@ void GRMaterialPoint::Serialize(DumpStream& ar)
 {
     FEMaterialPointData::Serialize(ar);
 
-    ar & nts;
-    ar & sn;
-    ar & K_delta_sigma;
-    ar & sigma_inv_h;
-    ar & sigma_inv_curr;
-    ar & m_constituents;
-    ar & m_lambda_act;
-    ar & m_F_s;
-    ar & m_F_curr;
-    ar & m_J_s;
-    ar & rhoR;
-    ar & rho;
-    ar & ups_infl_p;
-    ar & ups_infl_d;
-    ar & CB;
-    ar & CS;
-    ar & bar_tauw_curr;
-    ar & bar_tauw_h;
-    ar & lambda_m;
-    ar & lambda_0;
-    ar & T_act;
-    ar & k_act;
-    ar & m_sigma;
+    ar & nts ;
+    ar & sn ;
+    ar & m_dt ;
+    ar & K_delta_tauw ;
+    ar & K_delta_sigma ;
+    ar & sigma_inv_h ;
+    ar & sigma_inv_curr ;
+    ar & rho_hat_h ;
+    ar & m_constituents ;
+    ar & m_lambda_act ;
+    ar & m_F_s ;
+    ar & m_J_s ;
+    ar & rhoR ;
+    ar & rho ;
+    ar & ups_infl_p ;
+    ar & ups_infl_d ;
+    ar & CB ;
+    ar & CS ;
+    ar & bar_tauw_curr ;
+    ar & bar_tauw_h ;
+    ar & lambda_m ;
+    ar & lambda_0 ;
+    ar & T_act ;
+    ar & k_act ;
+    ar & m_sigma ;
+    // ar & m_CC ;
+
 
 }
 
@@ -179,13 +181,11 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
     // get current and end times
     const double t = timeInfo.currentTime;
     const double dt = timeInfo.timeIncrement;
-    //printf("--------------------------------\n");
     //fflush(stdout);
 
     sn = int(sn + dt);
 
     sigma_inv_curr = et.m_s.tr();
-    m_F_curr = m_F_prev;
     update_kinetics(sn);
     update_sigma(sn);
     et.m_J_star = m_J_s[sn];
@@ -218,7 +218,7 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
     // calculate the stress as a sum of deviatoric stress and pressure
     pt.update_sigma(sn);
 
-    mat3ds sbar = pow(J / et.m_J_star, -2.0 / 3.0)*(Q * pt.m_sigma * Q.transpose()).sym();
+    mat3ds sbar = pow(J / et.m_J_star, -2.0 / 3.0) * (Q * pt.m_sigma * Q.transpose()).sym();
 
     devstress = sbar.dev();
 
@@ -226,7 +226,7 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
     const tens4ds IxI = dyad1s(I);
     const tens4ds IoI = dyad4s(I);
 
-    tens4ds cbar = pow(J / et.m_J_star, -4.0 / 3.0)*pt.m_CC.pp(Q);
+    tens4ds cbar = pow(J / et.m_J_star, -4.0 / 3.0) * pt.m_CC.pp(Q);
 
     devtangent = cbar - 1./3.*(ddots(cbar, IxI) - IxI*(cbar.tr()/3.))
     + 2./3.*((IoI-IxI/3.)*sbar.tr()-dyad1s(sbar.dev(),I));

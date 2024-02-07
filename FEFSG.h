@@ -106,6 +106,10 @@ public:
 	    ar & m_inflammatory;
 	    ar & m_active;
 	    ar & m_polymer;
+	    ar & g_alpha_r;
+	    ar & g_alpha_theta;
+	    ar & g_alpha_z;
+	    ar & phi_alpha;
     }
 
 
@@ -187,9 +191,7 @@ public:
     double rho_hat_h;
     std::vector<GRConstituent> m_constituents;
     std::vector<double> m_lambda_act;
-    std::vector<mat3d> m_F_s;  // Vector of mat3d variables
-    mat3d m_F_curr;
-    mat3d m_F_prev;
+    std::vector<mat3d> m_F_s;
     std::vector<double> m_J_s;
     std::vector<double> rhoR;
     std::vector<double> rho;
