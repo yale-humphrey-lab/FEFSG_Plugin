@@ -3,7 +3,7 @@
   <Module type="solid" />
   <Control>
     <analysis>STATIC</analysis>
-    <time_steps>1</time_steps>
+    <time_steps>720</time_steps>
     <step_size>1</step_size>
     <solver>
       <diverge_reform>1</diverge_reform>
@@ -12,10 +12,10 @@
       <etol>1e-16</etol>
       <rtol>1e-16</rtol>
       <lstol>0.0</lstol>
-      <min_residual>1e-12</min_residual>
+      <min_residual>1e-6</min_residual>
       <rhoi>0</rhoi>
-      <linear_solver type="mkl_dss"/>
-      <max_refs>1000</max_refs>
+      <linear_solver type="mkl_dss" />
+      <max_refs>10000</max_refs>
       <qn_method type="BFGS">
         <max_ups>0</max_ups>
       </qn_method>
@@ -32,7 +32,7 @@
   <Material>
     <material id="1" name="Material1" type="FSG">
       <density>1</density>
-      <k>5000.0</k>
+      <k>1000.0</k>
       <a_val lc="2" type="math"> (0.1 + (1.0 - 0.1) * exp(-abs((Z - 0.0) / 3.0) ^ 5.0) * exp(-abs(atan2(Y,X) / pi) ^ 5.0))</a_val>
       <e_r type="math"> X/sqrt(X^2 + Y^2), Y/sqrt(X^2 + Y^2), 0 </e_r>
       <e_t type="math"> -Y/sqrt(X^2 + Y^2), X/sqrt(X^2 + Y^2), 0 </e_t>

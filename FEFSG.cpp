@@ -29,9 +29,9 @@ FEFSG::FEFSG(FEModel* pfem) : FEUncoupledMaterial(pfem)
     m_npmodel = 0;
     //m_secant_tangent = true;
     m_a_val = 0;
-    e_r = vec3d(1,0,0);
-    e_t = vec3d(0,1,0);
-    e_z = vec3d(0,0,1);
+    e_r = vec3d(0,0,1);
+    e_t = vec3d(1,0,0);
+    e_z = vec3d(0,1,0);
 }
 
 FEMaterialPointData* GRMaterialPoint::Copy()
@@ -67,7 +67,7 @@ void GRMaterialPoint::Init()
 
     for (int i=0; i<MAX_TIMESTEPS; ++i)
     {
-        m_lambda_act[i] = 0.0;
+        m_lambda_act[i] = 1.0;
         m_F_s[i] = mat3d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
         m_J_s[i] = 1.0;
         rhoR[i] = 0.0;
@@ -204,6 +204,7 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
 
 void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& devtangent)
 {       
+
     // The FEMaterialPoint classes are stored in a linked list. The specific material
     // point data needed by this function can be accessed using the ExtractData member.
     // In this case, we want to FEElasticMaterialPoint data since it stores the deformation
@@ -218,17 +219,20 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
     const double J = et.m_J;
     const int sn = pt.sn;
 
+    // Evaluate the distortional deformation gradient
+    mat3d F_bar = F*pow(J / et.m_J_star, -1. / 3.);
+
     // push deformation gradient to local coordinates
     mat3d Q = mat3d(e_r(mp), e_t(mp), e_z(mp));
     pt.K_delta_sigma = 0.184*m_a_val(mp);
     pt.m_constituents[0].c1_alpha_h = 89.710*(1.0 - 0.595*m_a_val(mp));
 
-    pt.m_F_s[sn] = Q.transpose() * et.m_F * Q;
+    pt.m_F_s[sn] = Q.transpose() * F_bar * Q;
 
     // calculate the stress as a sum of deviatoric stress and pressure
     pt.update_sigma(sn);
 
-    mat3ds sbar = pow(J / et.m_J_star, -2.0 / 3.0) * (Q * pt.m_sigma * Q.transpose()).sym();
+    mat3ds sbar = (Q * pt.m_sigma * Q.transpose()).sym() * et.m_J_star / J;
 
     devstress = sbar.dev();
 
@@ -236,7 +240,7 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
     const tens4ds IxI = dyad1s(I);
     const tens4ds IoI = dyad4s(I);
 
-    tens4ds cbar = pow(J / et.m_J_star, -4.0 / 3.0) * pt.m_CC.pp(Q);
+    tens4ds cbar = pt.m_CC.pp(Q) * et.m_J_star / J;
 
     devtangent = cbar - 1./3.*(ddots(cbar, IxI) - IxI*(cbar.tr()/3.))
     + 2./3.*((IoI-IxI/3.)*sbar.tr()-dyad1s(sbar.dev(),I));
@@ -411,9 +415,6 @@ void GRMaterialPoint::update_sigma(int sn) {
     //Get current time index
     int taun_min = 0;
 
-    mat3ds  full1(1.0,1.0,1.0,1.0,1.0,1.0);
-    tens4ds full11 = dyad1s(full1);
-
     //Find the current deformation gradient
     mat3d F_s = m_F_s[sn];
     double J_s = F_s.det(); //m_J_s[sn];
@@ -435,6 +436,7 @@ void GRMaterialPoint::update_sigma(int sn) {
             m_constituents[alpha].lambda_alpha_tau[sn] = sqrt(C_s(2, 2) * pow(cos(m_constituents[alpha].eta_alpha_h), 2)
                 + C_s(1, 1) * pow(sin(m_constituents[alpha].eta_alpha_h), 2));
 
+
         }
 
     }
@@ -447,6 +449,7 @@ void GRMaterialPoint::update_sigma(int sn) {
     mat3d G_alpha_h(0.0);
     double lambda_alpha_ntau_s = 0;
     mat3d F_alpha_ntau_s(1, 0, 0, 0, 1, 0, 0, 0, 1);
+    mat3ds C_alpha_ntau_s(0.0);
     double hat_S_alpha = 0;
     mat3ds sigma(0);
     double g_alpha = 1.0;
@@ -490,13 +493,7 @@ void GRMaterialPoint::update_sigma(int sn) {
 
     n = (sn - taun_min) + 1; //number of integration pts
 
-    int alpha_count = 0;
-        
-
     for  (int alpha=0; alpha<m_nconstituents; ++alpha) {
-
-        alpha_count = alpha_count + 1;
-
         //Trapz rule allows for fast heredity integral evaluation
         k_2 = m_constituents[alpha].k_alpha[sn];
         q_2 = 1.0;
@@ -523,10 +520,10 @@ void GRMaterialPoint::update_sigma(int sn) {
         hat_S_alpha = constitutive_return[0];
         hat_dS_dlambda2_alpha = constitutive_return[1];
         F_alpha_ntau_s = F_s*F_tau.inverse()*G_alpha_h_N;
+        C_alpha_ntau_s = (F_alpha_ntau_s.transpose() * F_alpha_ntau_s).sym();
 
-        hat_sigma_2 = 1.0/J_s * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
-        hat_CC_2 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11.pp(F_alpha_ntau_s);
-
+        hat_sigma_2 = 1.0 / J_s * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
+        hat_CC_2    = hat_dS_dlambda2_alpha * 2.0 / J_s * dyad1s(C_alpha_ntau_s);
 
         //Check if during G&R or at initial time point
         if (sn > 0 && m_constituents[alpha].m_degradable) {
@@ -536,7 +533,7 @@ void GRMaterialPoint::update_sigma(int sn) {
                 F_tau = m_F_s[taun];
                 J_tau = F_tau.det(); //m_J_s[taun];
                 F_tau.right_polar(R_tau,U_tau);
-                G_alpha_h_N = G_alpha_h*R_tau;
+                G_alpha_h_N = G_alpha_h * R_tau;
 
                 //Find 1st intermediate kinetics
                 k_1 = m_constituents[alpha].k_alpha[taun];
@@ -553,13 +550,14 @@ void GRMaterialPoint::update_sigma(int sn) {
                 hat_S_alpha = constitutive_return[0];
                 hat_dS_dlambda2_alpha = constitutive_return[1];
                 F_alpha_ntau_s = F_s*F_tau.inverse()*G_alpha_h_N;
+                C_alpha_ntau_s = (F_alpha_ntau_s.transpose() * F_alpha_ntau_s).sym();
 
                 hat_sigma_1 = 1.0 / J_s * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
-                hat_CC_1 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11.pp(F_alpha_ntau_s);
+                hat_CC_1 = hat_dS_dlambda2_alpha * 2.0 / J_s * dyad1s(C_alpha_ntau_s);
 
                 // Add integration contribution
                 sigma += (mq_2 * hat_sigma_2 + mq_1 * hat_sigma_1) / m_constituents[alpha].rho_hat_alpha_h * m_dt / 2;
-                CC += (mq_2 * hat_CC_2 + mq_1 * hat_CC_1) / m_constituents[alpha].rho_hat_alpha_h * m_dt / 2;
+                CC    += (mq_2 * hat_CC_2    + mq_1 * hat_CC_1)    / m_constituents[alpha].rho_hat_alpha_h * m_dt / 2;
 
                 //Store active vars for next iteration
                 //Find intermediate active state
@@ -577,7 +575,7 @@ void GRMaterialPoint::update_sigma(int sn) {
 
                 //Store intermediate stress and stiffness for next iteration
                 hat_sigma_2 = hat_sigma_1;
-                hat_CC_2 = hat_CC_1;
+                hat_CC_2    = hat_CC_1;
 
 
             }
@@ -594,17 +592,17 @@ void GRMaterialPoint::update_sigma(int sn) {
         }
         //Initial time point and constituents with prescribed degradation profiles
         else {
+
             //Find stress from initial cohort
             constitutive_return = m_constituents[alpha].constitutive(sn, 0);
             hat_S_alpha = constitutive_return[0];
             hat_dS_dlambda2_alpha = constitutive_return[1];
 
             F_alpha_ntau_s = F_s*G_alpha_h;
+            C_alpha_ntau_s = (F_alpha_ntau_s.transpose() * F_alpha_ntau_s).sym();
 
-            //Check if anisotropic
             hat_sigma_2 = 1.0/J_s * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
-
-            hat_CC_2 = hat_dS_dlambda2_alpha * 2.0 /J_s * full11.pp(F_alpha_ntau_s);
+            hat_CC_2 = hat_dS_dlambda2_alpha * 2.0 / J_s * dyad1s(C_alpha_ntau_s);
 
             // Add in stress and stiffness contributions
             sigma += m_constituents[alpha].rhoR_alpha[sn] /
@@ -612,6 +610,7 @@ void GRMaterialPoint::update_sigma(int sn) {
 
             CC += m_constituents[alpha].rhoR_alpha[sn] /
                 m_constituents[alpha].rho_hat_alpha_h * hat_CC_2;
+
         }
 
 
@@ -645,11 +644,11 @@ void GRMaterialPoint::update_sigma(int sn) {
                        m_constituents[alpha].rhoR_alpha[sn] / m_constituents[alpha].rho_hat_alpha_h;
 
 
-            sigma_act_mat = 1.0/J_s * (F_s * mat3dd(0,1,0) * F_s.transpose()).sym();
+            sigma_act_mat = 1.0/J_s * (F_s * mat3dd(0,S_act,0) * F_s.transpose()).sym();
             //TODO : Check this
 
             CC_act_mat = tens4ds(0.0);
-            CC_act_mat(1,1,1,1) = hat_dS_dlambda2_alpha;
+            CC_act_mat(1,1,1,1) = dSdC_act;
             CC_act_mat = 1.0 / J_s * CC_act_mat.pp(F_s);
 
             sigma += sigma_act_mat;

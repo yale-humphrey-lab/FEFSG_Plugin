@@ -138,13 +138,14 @@ public:
 	        lambda_alpha_ntau_s =  g_alpha_h * lambda_alpha_tau[sn] /  lambda_alpha_tau[ts];
 
 	        if (lambda_alpha_ntau_s < 1) {
-	            lambda_alpha_ntau_s = 1;
+		        hat_S_alpha =  0;
+		        hat_dS_dlambda2_alpha =  0;
+	        } else {
+		        Q1 = (pow(lambda_alpha_ntau_s, 2) - 1);
+		        Q2 =  c2_alpha_h * pow(Q1, 2);
+		        hat_S_alpha =  c1_alpha_h * Q1 * exp(Q2);
+		        hat_dS_dlambda2_alpha =  c1_alpha_h * exp(Q2) * (1 + 2 * Q2);
 	        }
-
-	        Q1 = (pow(lambda_alpha_ntau_s, 2) - 1);
-	        Q2 =  c2_alpha_h * pow(Q1, 2);
-	        hat_S_alpha =  c1_alpha_h * Q1 * exp(Q2);
-	        hat_dS_dlambda2_alpha =  c1_alpha_h * exp(Q2) * (1 + 2 * Q2);
 
 	    }
 	    else {
