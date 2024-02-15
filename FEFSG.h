@@ -25,7 +25,8 @@ public:
     double c1_alpha_h;
     double c2_alpha_h;
     double g_alpha_h;
-    mat3dd G_alpha_h;
+    mat3d G_alpha_h;
+    vec3d a_alpha_h;
     double k_alpha_h;
     double rho_hat_alpha_h;
     double rhoR_alpha_h;
@@ -62,7 +63,8 @@ public:
         c1_alpha_h = 0.0;
         c2_alpha_h = 0.0;
         g_alpha_h = 0.0;
-        G_alpha_h = mat3dd(0.0);
+        G_alpha_h = mat3d(0.0);
+        a_alpha_h = vec3d(0.0);
         k_alpha_h = 0.0;
         rho_hat_alpha_h = 0.0;
         rhoR_alpha_h = 0.0;
@@ -121,7 +123,7 @@ public:
     }
 
 
-	vector<double> constitutive(int sn, int ts) {
+	vector<double> constitutive(double lambda_alpha_tau_curr, double lambda_alpha_tau_ts, int sn) {
 
 	    double lambda_alpha_ntau_s = 0;
 	    double Q1 = 0;
@@ -135,7 +137,7 @@ public:
 	    //Check if ansisotropic
 	    if ( eta_alpha_h >= 0) {
 
-	        lambda_alpha_ntau_s =  g_alpha_h * lambda_alpha_tau[sn] /  lambda_alpha_tau[ts];
+	        lambda_alpha_ntau_s =  g_alpha_h * lambda_alpha_tau_curr / lambda_alpha_tau_ts;
 
 	        if (lambda_alpha_ntau_s < 1) {
 		        hat_S_alpha =  0;
@@ -195,7 +197,7 @@ public:
 public:
     int nts;
     int sn;
-    double m_nconstituents;
+    int m_nconstituents;
     double m_dt;
     double K_delta_tauw;
     double K_delta_sigma;
@@ -206,6 +208,7 @@ public:
     double m_lambda_act[MAX_TIMESTEPS];
     mat3d  m_F_s[MAX_TIMESTEPS];
     double m_J_s[MAX_TIMESTEPS];
+    double m_J_det_s[MAX_TIMESTEPS];
     double rhoR[MAX_TIMESTEPS];
     double rho[MAX_TIMESTEPS];
     double ups_infl_p[MAX_TIMESTEPS];
@@ -219,6 +222,8 @@ public:
     double T_act;
     double k_act;
     mat3ds m_sigma;
+    mat3d m_F_curr;
+    double m_J_curr;
     tens4ds m_CC;
 };
 
