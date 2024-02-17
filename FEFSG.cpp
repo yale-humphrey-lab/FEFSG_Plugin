@@ -250,8 +250,8 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
 
     // push deformation gradient to local coordinates
     mat3d Q = mat3d(e_r(mp), e_t(mp), e_z(mp));
-    //pt.K_delta_sigma = 0.184*m_a_val(mp);
-    //pt.m_constituents[0].c1_alpha_h = 89.710*(1.0 - 0.595*m_a_val(mp));
+    pt.K_delta_sigma = 0.184*m_a_val(mp);
+    pt.m_constituents[0].c1_alpha_h = 89.710*(1.0 - 0.595*m_a_val(mp));
 
     pt.m_F_curr = Q.transpose() * F_bar * Q;
     pt.m_J_curr = J;
