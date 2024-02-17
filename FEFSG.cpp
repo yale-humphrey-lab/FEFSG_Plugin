@@ -6,9 +6,6 @@
 #include "FECore/log.h"                         // to print to log file and/or screen
 #include <iostream>                             // to use cin.get()
 #include <sstream>
-#include <signal.h>
-#define _USE_MATH_DEFINES                       // to introduce pi constant (1/2)
-#include <math.h>                               // to introduce pi constant (2/2)
 #include <limits>
 #include <fstream>
 #include <algorithm>  // Include for std::count
@@ -117,13 +114,14 @@ void GRMaterialPoint::Init()
                   >> m_constituents[i].k_alpha_h >> m_constituents[i].K_tauw_p_alpha_h >> m_constituents[i].K_sigma_p_alpha_h
                   >> m_constituents[i].K_tauw_d_alpha_h >> m_constituents[i].K_sigma_d_alpha_h;
 
-        m_constituents[i].eta_alpha_h = m_constituents[i].eta_alpha_h * M_PI / 180.0;
+        m_constituents[i].eta_alpha_h = m_constituents[i].eta_alpha_h * PI / 180.0;
         m_constituents[i].rho_hat_alpha_h = rho_hat_h;
         m_constituents[i].rhoR_alpha_h = m_constituents[i].phi_alpha * rho_hat_h;
 
         if (m_constituents[i].eta_alpha_h >= 0) { //for anisotropic m_constituents[i]s
-            m_constituents[i].G_alpha_h = mat3d(1.,0.,0.,0.,cos(m_constituents[i].eta_alpha_h),-sin(m_constituents[i].eta_alpha_h),
-                                                0., -sin(m_constituents[i].eta_alpha_h),cos(m_constituents[i].eta_alpha_h)) * mat3dd(0.,0.,1.)* m_constituents[i].g_alpha_h;
+            m_constituents[i].G_alpha_h = mat3d(0.,0.,0.,
+                                                0.,0.,-sin(m_constituents[i].eta_alpha_h),
+                                                0.,0.,cos(m_constituents[i].eta_alpha_h)) * m_constituents[i].g_alpha_h;
         }
         else { //for isotropic m_constituents[i]s (i.e. elastin)
             m_constituents[i].G_alpha_h = mat3dd(m_constituents[i].g_alpha_r, m_constituents[i].g_alpha_theta, m_constituents[i].g_alpha_z);
@@ -217,9 +215,10 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
 
         //Check to see if constituent is isotropic
         if (m_constituents[alpha].eta_alpha_h >= 0) {
+
+            vec3d ar(0.,-sin(m_constituents[alpha].eta_alpha_h),cos(m_constituents[alpha].eta_alpha_h));
             //Stretch is equal to the sqrt of I4
-            m_constituents[alpha].lambda_alpha_tau[sn] = sqrt(C_s(1, 1) * pow(sin(m_constituents[alpha].eta_alpha_h), 2)
-                                                            + C_s(2, 2) * pow(cos(m_constituents[alpha].eta_alpha_h), 2));
+            m_constituents[alpha].lambda_alpha_tau[sn] = sqrt(ar*(C_s*ar));
 
         }
 
@@ -294,7 +293,6 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
     et.m_a.x = pt.m_CC(0,0,0,0);     // Radial stiffness
     et.m_a.y = pt.m_CC(1,1,1,1);     // Circumfrential stiffness
     et.m_a.z = pt.m_CC(2,2,2,2);     // Axial stiffness
-
 
 }
 
@@ -460,10 +458,9 @@ void GRMaterialPoint::update_sigma(int sn) {
         //Check to see if constituent is isotropic
         if (m_constituents[alpha].eta_alpha_h >= 0) {
 
+            vec3d ar(0.,-sin(m_constituents[alpha].eta_alpha_h),cos(m_constituents[alpha].eta_alpha_h));
             //Stretch is equal to the sqrt of I4
-            lambda_alpha_ntau_curr[alpha] = sqrt(C_s(2, 2) * pow(cos(m_constituents[alpha].eta_alpha_h), 2)
-                + C_s(1, 1) * pow(sin(m_constituents[alpha].eta_alpha_h), 2));
-
+            lambda_alpha_ntau_curr[alpha] = sqrt(ar*(C_s*ar));
 
         }
 
@@ -631,9 +628,9 @@ void GRMaterialPoint::update_sigma(int sn) {
             B_alpha_ntau_s = (F_alpha_ntau_s * F_alpha_ntau_s.transpose()).sym();
             C_alpha_ntau_s = (F_alpha_ntau_s.transpose() * F_alpha_ntau_s).sym();
 
-            hat_sigma_2 = (1 / m_J_curr) * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
+            hat_sigma_2 = (1 / m_J_curr) * B_alpha_ntau_s * hat_S_alpha;
             hat_CC_2 = 2.0 * (1 / m_J_curr) * hat_dS_dlambda2_alpha * dyad1s(B_alpha_ntau_s);
-
+            
             // Add in stress and stiffness contributions
             sigma += m_constituents[alpha].rhoR_alpha[sn] /
                 m_constituents[alpha].rho_hat_alpha_h * hat_sigma_2;                

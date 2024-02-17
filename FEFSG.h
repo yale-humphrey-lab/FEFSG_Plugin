@@ -140,7 +140,7 @@ public:
 	        lambda_alpha_ntau_s =  g_alpha_h * lambda_alpha_tau_curr / lambda_alpha_tau_ts;
 	        Q1 = (pow(lambda_alpha_ntau_s, 2) - 1);
 
-	        if (Q1 >= 1e-10) {
+	        if (Q1 >= 0.0) {
 		        Q1 = (pow(lambda_alpha_ntau_s, 2) - 1);
 		        Q2 =  c2_alpha_h * pow(Q1, 2);
 		        hat_S_alpha =  c1_alpha_h * Q1 * exp(Q2);
