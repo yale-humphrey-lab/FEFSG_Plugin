@@ -138,11 +138,9 @@ public:
 	    if ( eta_alpha_h >= 0) {
 
 	        lambda_alpha_ntau_s =  g_alpha_h * lambda_alpha_tau_curr / lambda_alpha_tau_ts;
+	        Q1 = (pow(lambda_alpha_ntau_s, 2) - 1);
 
-	        if (lambda_alpha_ntau_s < 1) {
-		        hat_S_alpha =  0;
-		        hat_dS_dlambda2_alpha =  0;
-	        } else {
+	        if (Q1 >= 1e-10) {
 		        Q1 = (pow(lambda_alpha_ntau_s, 2) - 1);
 		        Q2 =  c2_alpha_h * pow(Q1, 2);
 		        hat_S_alpha =  c1_alpha_h * Q1 * exp(Q2);
@@ -190,6 +188,7 @@ public:
 	void update_sigma(int sn);
 	void update_kinetics(int sn);
 
+	
 	enum { MAX_TIMESTEPS = 720 };
 	enum { MAX_CONSTITUENTS = 6 };
 
@@ -256,6 +255,8 @@ public:
 public:
 	// function to perform material evaluation. calculates stress and tangent to avoid code duplication
 	void DevStressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent);
+
+	
 
 	// This function calculates the spatial (i.e. Cauchy or true) stress.
 	// It takes one parameter, the FEMaterialPoint and returns a mat3ds object

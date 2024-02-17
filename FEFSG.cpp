@@ -29,9 +29,9 @@ FEFSG::FEFSG(FEModel* pfem) : FEUncoupledMaterial(pfem)
     m_npmodel = 0;
     //m_secant_tangent = true;
     m_a_val = 0;
-    e_r = vec3d(0,0,1);
-    e_t = vec3d(1,0,0);
-    e_z = vec3d(0,1,0);
+    e_r = vec3d(1,0,0);
+    e_t = vec3d(0,1,0);
+    e_z = vec3d(0,0,1);
 }
 
 FEMaterialPointData* GRMaterialPoint::Copy()
@@ -122,7 +122,8 @@ void GRMaterialPoint::Init()
         m_constituents[i].rhoR_alpha_h = m_constituents[i].phi_alpha * rho_hat_h;
 
         if (m_constituents[i].eta_alpha_h >= 0) { //for anisotropic m_constituents[i]s
-            m_constituents[i].a_alpha_h = vec3d(0., sin(m_constituents[i].eta_alpha_h), cos(m_constituents[i].eta_alpha_h)) * m_constituents[i].g_alpha_h;
+            m_constituents[i].G_alpha_h = mat3d(1.,0.,0.,0.,cos(m_constituents[i].eta_alpha_h),-sin(m_constituents[i].eta_alpha_h),
+                                                0., -sin(m_constituents[i].eta_alpha_h),cos(m_constituents[i].eta_alpha_h)) * mat3dd(0.,0.,1.)* m_constituents[i].g_alpha_h;
         }
         else { //for isotropic m_constituents[i]s (i.e. elastin)
             m_constituents[i].G_alpha_h = mat3dd(m_constituents[i].g_alpha_r, m_constituents[i].g_alpha_theta, m_constituents[i].g_alpha_z);
@@ -249,8 +250,8 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
 
     // push deformation gradient to local coordinates
     mat3d Q = mat3d(e_r(mp), e_t(mp), e_z(mp));
-    pt.K_delta_sigma = 0.184*m_a_val(mp);
-    pt.m_constituents[0].c1_alpha_h = 89.710*(1.0 - 0.595*m_a_val(mp));
+    //pt.K_delta_sigma = 0.184*m_a_val(mp);
+    //pt.m_constituents[0].c1_alpha_h = 89.710*(1.0 - 0.595*m_a_val(mp));
 
     pt.m_F_curr = Q.transpose() * F_bar * Q;
     pt.m_J_curr = J;
@@ -474,10 +475,9 @@ void GRMaterialPoint::update_sigma(int sn) {
     mat3d F_tau  = m_F_s[sn];
     mat3d G_alpha_h_N(0.0);
     mat3d G_alpha_h(0.0);
-    vec3d a_alpha_h(0.0);
-    vec3d a_alpha_h_N(0.0);
     double lambda_alpha_ntau_s = 0;
     mat3d F_alpha_ntau_s(1, 0, 0, 0, 1, 0, 0, 0, 1);
+    mat3ds C_alpha_ntau_s(0.0);
     mat3ds B_alpha_ntau_s(0.0);
     double hat_S_alpha = 0;
     mat3ds sigma(0);
@@ -540,17 +540,16 @@ void GRMaterialPoint::update_sigma(int sn) {
         J_tau = F_s.det();
         F_tau.right_polar(R_tau,U_tau);
         G_alpha_h_N = G_alpha_h * R_tau;
-        a_alpha_h_N = R_tau * a_alpha_h;
 
         constitutive_return = m_constituents[alpha].constitutive(lambda_alpha_ntau_curr[alpha], m_constituents[alpha].lambda_alpha_tau[sn], sn);
 
         hat_S_alpha = constitutive_return[0];
         hat_dS_dlambda2_alpha = constitutive_return[1];
-        F_alpha_ntau_s = F_s*F_tau.inverse();
-        B_alpha_ntau_s = (F_alpha_ntau_s * dyad(a_alpha_h_N) * F_alpha_ntau_s.transpose()).sym();
+        F_alpha_ntau_s = F_s*F_tau.inverse()*G_alpha_h_N;
+        B_alpha_ntau_s = (F_alpha_ntau_s * F_alpha_ntau_s.transpose()).sym();
+        C_alpha_ntau_s = (F_alpha_ntau_s.transpose() * F_alpha_ntau_s).sym();
 
-
-        hat_sigma_2 = (1 / m_J_curr) * hat_S_alpha * B_alpha_ntau_s;
+        hat_sigma_2 = (1 / m_J_curr) * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
         hat_CC_2    = 2.0 * (1 / m_J_curr) * hat_dS_dlambda2_alpha * dyad1s(B_alpha_ntau_s);
 
         //Check if during G&R or at initial time point
@@ -562,7 +561,6 @@ void GRMaterialPoint::update_sigma(int sn) {
                 J_tau = F_tau.det(); //m_J_s[taun];
                 F_tau.right_polar(R_tau,U_tau);
                 G_alpha_h_N = G_alpha_h * R_tau;
-                a_alpha_h_N = R_tau * a_alpha_h;
 
                 //Find 1st intermediate kinetics
                 k_1 = m_constituents[alpha].k_alpha[taun];
@@ -579,10 +577,11 @@ void GRMaterialPoint::update_sigma(int sn) {
 
                 hat_S_alpha = constitutive_return[0];
                 hat_dS_dlambda2_alpha = constitutive_return[1];
-                F_alpha_ntau_s = F_s*F_tau.inverse();
-                B_alpha_ntau_s = (F_alpha_ntau_s * dyad(a_alpha_h_N) * F_alpha_ntau_s.transpose()).sym();
+                F_alpha_ntau_s = F_s*F_tau.inverse()*G_alpha_h_N;
+                B_alpha_ntau_s = (F_alpha_ntau_s * F_alpha_ntau_s.transpose()).sym();
+                C_alpha_ntau_s = (F_alpha_ntau_s.transpose() * F_alpha_ntau_s).sym();
 
-                hat_sigma_1 = (1 / m_J_curr) * hat_S_alpha * B_alpha_ntau_s;
+                hat_sigma_1 = (1 / m_J_curr) * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
                 hat_CC_1 = 2.0 * (1 / m_J_curr) * hat_dS_dlambda2_alpha * dyad1s(B_alpha_ntau_s);
 
                 // Add integration contribution
@@ -630,8 +629,9 @@ void GRMaterialPoint::update_sigma(int sn) {
 
             F_alpha_ntau_s = F_s*G_alpha_h;
             B_alpha_ntau_s = (F_alpha_ntau_s * F_alpha_ntau_s.transpose()).sym();
+            C_alpha_ntau_s = (F_alpha_ntau_s.transpose() * F_alpha_ntau_s).sym();
 
-            hat_sigma_2 = (1 / m_J_curr) * hat_S_alpha * B_alpha_ntau_s;
+            hat_sigma_2 = (1 / m_J_curr) * (F_alpha_ntau_s * hat_S_alpha * F_alpha_ntau_s.transpose()).sym();
             hat_CC_2 = 2.0 * (1 / m_J_curr) * hat_dS_dlambda2_alpha * dyad1s(B_alpha_ntau_s);
 
             // Add in stress and stiffness contributions
