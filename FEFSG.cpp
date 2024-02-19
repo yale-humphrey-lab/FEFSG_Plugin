@@ -118,6 +118,9 @@ void GRMaterialPoint::Init()
         m_constituents[i].rho_hat_alpha_h = rho_hat_h;
         m_constituents[i].rhoR_alpha_h = m_constituents[i].phi_alpha * rho_hat_h;
 
+        m_constituents[i].c1_alpha = m_constituents[i].c1_alpha_h;
+        m_constituents[i].c2_alpha = m_constituents[i].c2_alpha_h;
+
         if (m_constituents[i].eta_alpha_h >= 0) { //for anisotropic m_constituents[i]s
             m_constituents[i].G_alpha_h = mat3d(0.,0.,0.,
                                                 0.,0.,-sin(m_constituents[i].eta_alpha_h),
@@ -198,32 +201,36 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
     const double dt = timeInfo.timeIncrement;
     //fflush(stdout);
 
-    sn = int(sn + dt);
+    sn = int(t) - 1; //int(sn + dt);
 
-    sigma_inv_curr = et.m_s.tr();
+    if (sn > 0){
+        sigma_inv_curr = et.m_s.tr();
 
-    update_kinetics(sn);
-    et.m_J_star = m_J_s[sn];
-    m_F_s[sn] = m_F_curr;
-    m_J_det_s[sn] = m_J_curr;
+        update_kinetics(sn);
+        et.m_J_star = m_J_s[sn];
+        m_F_s[sn] = m_F_curr;
+        m_J_det_s[sn] = m_J_curr;
 
+        // update stretch vectors
+        mat3ds C_s = (m_F_curr.transpose()*m_F_curr).sym();
+        //Calculate constituent specific stretches for evolving constituents at the current time
+        for  (int alpha=0; alpha<m_nconstituents; ++alpha) {
 
-    // update stretch vectors
-    mat3ds C_s = (m_F_curr.transpose()*m_F_curr).sym();
-    //Calculate constituent specific stretches for evolving constituents at the current time
-    for  (int alpha=0; alpha<m_nconstituents; ++alpha) {
+            //Check to see if constituent is isotropic
+            if (m_constituents[alpha].eta_alpha_h >= 0) {
 
-        //Check to see if constituent is isotropic
-        if (m_constituents[alpha].eta_alpha_h >= 0) {
+                vec3d ar(0.,-sin(m_constituents[alpha].eta_alpha_h),cos(m_constituents[alpha].eta_alpha_h));
+                //Stretch is equal to the sqrt of I4
+                m_constituents[alpha].lambda_alpha_tau[sn] = sqrt(ar*(C_s*ar));
 
-            vec3d ar(0.,-sin(m_constituents[alpha].eta_alpha_h),cos(m_constituents[alpha].eta_alpha_h));
-            //Stretch is equal to the sqrt of I4
-            m_constituents[alpha].lambda_alpha_tau[sn] = sqrt(ar*(C_s*ar));
+            }
 
         }
-
+        m_lambda_act[sn] = sqrt(C_s(1, 1));
+    } else {
+        sigma_inv_h = et.m_s.tr();
     }
-    m_lambda_act[sn] = sqrt(C_s(1, 1));
+
 
 }
 
@@ -249,8 +256,11 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
 
     // push deformation gradient to local coordinates
     mat3d Q = mat3d(e_r(mp), e_t(mp), e_z(mp));
-    pt.K_delta_sigma = 0.184*m_a_val(mp);
-    pt.m_constituents[0].c1_alpha_h = 89.710*(1.0 - 0.595*m_a_val(mp));
+
+    if (sn > 0){
+        pt.K_delta_sigma = 0.184*m_a_val(mp);
+        pt.m_constituents[0].c1_alpha = pt.m_constituents[0].c1_alpha_h*(1.0 - 0.595*m_a_val(mp));
+    }
 
     pt.m_F_curr = Q.transpose() * F_bar * Q;
     pt.m_J_curr = J;
@@ -289,7 +299,8 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
 
     et.m_v.x = pt.m_J_s[sn];                             // Target volume
     et.m_v.y = m_a_val(mp);                             // Aneurysm injury
-    et.m_v.z = pt.m_constituents[0].rhoR_alpha[sn];     // Generally, elasticity density
+    et.m_v.z = pt.sigma_inv_h;     // Generally, elasticity density
+
     et.m_a.x = pt.m_CC(0,0,0,0);     // Radial stiffness
     et.m_a.y = pt.m_CC(1,1,1,1);     // Circumfrential stiffness
     et.m_a.z = pt.m_CC(2,2,2,2);     // Axial stiffness
@@ -630,7 +641,7 @@ void GRMaterialPoint::update_sigma(int sn) {
 
             hat_sigma_2 = (1 / m_J_curr) * B_alpha_ntau_s * hat_S_alpha;
             hat_CC_2 = 2.0 * (1 / m_J_curr) * hat_dS_dlambda2_alpha * dyad1s(B_alpha_ntau_s);
-            
+
             // Add in stress and stiffness contributions
             sigma += m_constituents[alpha].rhoR_alpha[sn] /
                 m_constituents[alpha].rho_hat_alpha_h * hat_sigma_2;                

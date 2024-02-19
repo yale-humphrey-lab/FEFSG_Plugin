@@ -24,6 +24,8 @@ public:
     double eta_alpha_h;
     double c1_alpha_h;
     double c2_alpha_h;
+    double c1_alpha;
+    double c2_alpha;
     double g_alpha_h;
     mat3d G_alpha_h;
     vec3d a_alpha_h;
@@ -62,6 +64,8 @@ public:
         eta_alpha_h = 0.0;
         c1_alpha_h = 0.0;
         c2_alpha_h = 0.0;
+        c1_alpha = 0.0;
+        c2_alpha = 0.0;
         g_alpha_h = 0.0;
         G_alpha_h = mat3d(0.0);
         a_alpha_h = vec3d(0.0);
@@ -97,6 +101,8 @@ public:
 	    ar & eta_alpha_h;
 	    ar & c1_alpha_h;
 	    ar & c2_alpha_h;
+	    ar & c1_alpha;
+	    ar & c2_alpha;
 	    ar & g_alpha_h;
 	    ar & G_alpha_h;
 	    ar & k_alpha_h;
@@ -142,9 +148,9 @@ public:
 
 	        if (Q1 >= 0.0) {
 		        Q1 = (pow(lambda_alpha_ntau_s, 2) - 1);
-		        Q2 =  c2_alpha_h * pow(Q1, 2);
-		        hat_S_alpha =  c1_alpha_h * Q1 * exp(Q2);
-		        hat_dS_dlambda2_alpha =  c1_alpha_h * exp(Q2) * (1 + 2 * Q2);
+		        Q2 =  c2_alpha * pow(Q1, 2);
+		        hat_S_alpha =  c1_alpha * Q1 * exp(Q2);
+		        hat_dS_dlambda2_alpha =  c1_alpha * exp(Q2) * (1 + 2 * Q2);
 	        }
 
 	    }
@@ -164,7 +170,7 @@ public:
 	            pol_mod = 1;
 	        }
 
-	        hat_S_alpha = pol_mod *  c1_alpha_h;
+	        hat_S_alpha = pol_mod *  c1_alpha;
 	    }
 
 	    return_constitutive = { hat_S_alpha , hat_dS_dlambda2_alpha };
