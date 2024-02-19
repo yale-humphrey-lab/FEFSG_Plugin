@@ -80,10 +80,11 @@ def getGeometry():
     thickness = 4.02e-02
     length = 15
 
-    half = True
-    quarter = False
+    half = False
+    quarter = True
     linear = False
-    len_half = False
+    hex_20 = False
+    len_half = True
 
     if linear == False:
         numCirc = numCirc*2 #Must be divisible by 4!
@@ -189,6 +190,28 @@ def getGeometry():
             [1, 1, 2],
             [1, 1, 1]]
 
+    hex_20_coords = [
+            [0, 0, 0],
+            [2, 0, 0],
+            [2, 2, 0],
+            [0, 2, 0],
+            [0, 0, 2],
+            [2, 0, 2],
+            [2, 2, 2],
+            [0, 2, 2],
+            [1, 0, 0],
+            [2, 1, 0],
+            [1, 2, 0],
+            [0, 1, 0],
+            [1, 0, 2],
+            [2, 1, 2],
+            [1, 2, 2],
+            [0, 1, 2],
+            [0, 0, 1],
+            [2, 0, 1],
+            [2, 2, 1],
+            [0, 2, 1]]
+
     hex_quad_coords =  [
             [0, 0],
             [0, 2],
@@ -200,6 +223,16 @@ def getGeometry():
             [1, 0],
             [1, 1]]
 
+    hex_20_quad_coords =  [
+            [0, 0],
+            [0, 2],
+            [2, 2],
+            [2, 0],
+            [0, 1],
+            [1, 2],
+            [2, 1],
+            [1, 0]]
+
 
     maxCirc = numCirc
     numJump = 2
@@ -210,6 +243,10 @@ def getGeometry():
         numJump = 1
         elem_coords = linear_coords
         quad_coords = linear_quad_coords
+
+    if hex_20 == True:
+        elem_coords = hex_20_coords
+        quad_coords = hex_20_quad_coords
 
     if half:
         maxCirc = numCirc//2
@@ -274,6 +311,8 @@ def getGeometry():
     xml_object = ''
     if linear:
         xml_object += '\t<Elements type="hex8" mat="1" name="Part1">\n'
+    elif hex_20:
+        xml_object +=  '\t<Elements type="hex20" mat="1" name="Part1">\n'
     else:
         xml_object += '\t<Elements type="hex27" mat="1" name="Part1">\n'
     for i, element in enumerate(cells, start=1):
@@ -305,6 +344,8 @@ def getGeometry():
         str_val = ', '.join(map(str, surface))
         if linear:
             xml_object += f'\t\t<quad4 id="{i}">{str_val}</quad4>\n'
+        elif hex_20:
+            xml_object += f'\t\t<quad8 id="{i}">{str_val}</quad8>\n'
         else:
             xml_object += f'\t\t<quad9 id="{i}">{str_val}</quad9>\n'
     xml_object += '\t</Surface>\n'
@@ -317,6 +358,8 @@ def getGeometry():
         str_val = ', '.join(map(str, surface))
         if linear:
             xml_object += f'\t\t<quad4 id="{i}">{str_val}</quad4>\n'
+        elif hex_20:
+            xml_object += f'\t\t<quad8 id="{i}">{str_val}</quad8>\n'
         else:
             xml_object += f'\t\t<quad9 id="{i}">{str_val}</quad9>\n'
     xml_object += '\t</Surface>\n'
