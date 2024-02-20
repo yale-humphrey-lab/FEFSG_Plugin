@@ -43,7 +43,6 @@ void GRMaterialPoint::Init()
     FEMaterialPointData::Init();
 
     m_dt = 1.0;
-    nts = 720;
     sn = 0;
     K_delta_tauw = 0.0;
     K_delta_sigma = 0.0;
@@ -151,7 +150,6 @@ void GRMaterialPoint::Serialize(DumpStream& ar)
 {
     FEMaterialPointData::Serialize(ar);
 
-    ar & nts;
     ar & sn;
     ar & m_dt;
     ar & m_nconstituents;
