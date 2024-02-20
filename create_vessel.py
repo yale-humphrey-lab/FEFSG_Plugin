@@ -73,16 +73,16 @@ def getAneurysmValue(z, theta):
 def getGeometry():
     print("Initializing cylindrical vessel...")
 
-    numCirc = 20 #Must be divisible by 4!
-    numLen = 40
-    numRad = 1
+    numCirc = 60 #Must be divisible by 4!
+    numLen = 160
+    numRad = 4
     radius = 6.468e-01
     thickness = 4.02e-02
     length = 15
 
     half = False
     quarter = True
-    linear = False
+    linear = True
     hex_20 = False
     len_half = True
 
