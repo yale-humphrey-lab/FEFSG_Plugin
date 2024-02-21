@@ -1,9 +1,8 @@
 //#include "stdafx.h"
 #include "FEFSG.h"
-#include "FEBioMech/FEUncoupledMaterial.h"
-#include "FECore/FEAnalysis.h"                  // to get end time
-#include "FECore/FEModel.h"                     // to get current time
-#include "FECore/log.h"                         // to print to log file and/or screen
+#include <FEBioMech/FEUncoupledMaterial.h>
+#include <FECore/FEAnalysis.h>                  // to get end time
+#include <FECore/FEModel.h>                     // to get current time
 #include <iostream>                             // to use cin.get()
 #include <sstream>
 #include <limits>
@@ -94,7 +93,7 @@ void GRMaterialPoint::Init()
     // Determine the number of lines in the file (excluding the first line)
     m_nconstituents = std::count(std::istreambuf_iterator<char>(inputFile), std::istreambuf_iterator<char>(), '\n');
     if (m_nconstituents > MAX_CONSTITUENTS) {
-        std::cerr << "Too many constituents for simulation, edit plugin." << filename << std::endl;
+        std::cerr << "Too many constituents for simulation. Edit plugin if you want more." << filename << std::endl;
         return;
     }
 
@@ -201,6 +200,9 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
 
     sn = int(t) - 1; //int(sn + dt);
 
+    //FEModel& fem = *FEModel();
+    //feLogEx(fem*, "So far, things are looking good.");
+
     if (sn > 0){
         sigma_inv_curr = et.m_s.tr();
 
@@ -229,6 +231,8 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
         sigma_inv_h = et.m_s.tr();
     }
 
+    // don't forget to call the base class
+    FEMaterialPointData::Update(timeInfo);
 
 }
 
@@ -296,8 +300,8 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
     // TODO: confirm what "stiffness" means in this context
 
     et.m_v.x = pt.m_J_s[sn];                             // Target volume
-    et.m_v.y = m_a_val(mp);                             // Aneurysm injury
-    et.m_v.z = pt.sigma_inv_h;     // Generally, elasticity density
+    et.m_v.y = pt.m_sigma(1,1);                             // Aneurysm injury
+    et.m_v.z = pt.m_sigma(2,2);     // Generally, elasticity density
 
     et.m_a.x = pt.m_CC(0,0,0,0);     // Radial stiffness
     et.m_a.y = pt.m_CC(1,1,1,1);     // Circumfrential stiffness

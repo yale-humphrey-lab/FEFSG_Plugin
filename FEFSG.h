@@ -1,4 +1,4 @@
-//#pragma once
+#pragma once
 //=============================================================================
 // This plugin example illustrates how to create a new material. 
 // It requires FEBio 2.5 (or up)
@@ -12,7 +12,7 @@
 //-----------------------------------------------------------------------------
 // We need to include this file since our new material class will inherit from
 // FEElasticMaterial which is defined in this include files.
-#include "FEBioMech/FEUncoupledMaterial.h"
+#include <FEBioMech/FEUncoupledMaterial.h>
 #include <FECore/FEModelParam.h>
 #include <iostream>								// to use cin.get()
 
@@ -193,7 +193,6 @@ public:
 
 	void update_sigma(int sn);
 	void update_kinetics(int sn);
-
 	
 	enum { MAX_TIMESTEPS = 1441 };
 	enum { MAX_CONSTITUENTS = 6 };
