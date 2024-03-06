@@ -27,8 +27,6 @@ public:
     double c1_alpha;
     double c2_alpha;
     double g_alpha_h;
-    mat3d G_alpha_h;
-    vec3d a_alpha_h;
     double k_alpha_h;
     double rho_hat_alpha_h;
     double rhoR_alpha_h;
@@ -67,8 +65,6 @@ public:
         c1_alpha = 0.0;
         c2_alpha = 0.0;
         g_alpha_h = 0.0;
-        G_alpha_h = mat3d(0.0);
-        a_alpha_h = vec3d(0.0);
         k_alpha_h = 0.0;
         rho_hat_alpha_h = 0.0;
         rhoR_alpha_h = 0.0;
@@ -104,7 +100,6 @@ public:
 	    ar & c1_alpha;
 	    ar & c2_alpha;
 	    ar & g_alpha_h;
-	    ar & G_alpha_h;
 	    ar & k_alpha_h;
 	    ar & rho_hat_alpha_h;
 	    ar & rhoR_alpha_h;
@@ -129,34 +124,58 @@ public:
     }
 
 
-	vector<double> constitutive(double lambda_alpha_tau_curr, double lambda_alpha_tau_ts, int sn) {
+	void constitutive(mat3d F_s, mat3d F_tau, int sn, mat3ds& stress, tens4ds& tangent) {
 
-	    double lambda_alpha_ntau_s = 0;
-	    double Q1 = 0;
-	    double Q2 = 0;
-	    double hat_S_alpha = 0;
-	    double hat_dS_dlambda2_alpha = 0;
 	    double pol_mod = 0;
 	    double epsilon_curr = 0;
-	    vector<double> return_constitutive = { 0, 0 };
+    
+	    // Evaluate the elasticity tensor
+	    mat3dd I(1);
+	    tens4ds IxI = dyad1s(I);
+	    tens4ds I4  = dyad4s(I);
+
+	    stress = mat3ds(0.0);
+	    tangent = tens4ds(0.0);
 
 	    //Check if ansisotropic
 	    if ( eta_alpha_h >= 0) {
 
-	        lambda_alpha_ntau_s =  g_alpha_h * lambda_alpha_tau_curr / lambda_alpha_tau_ts;
-	        Q1 = (pow(lambda_alpha_ntau_s, 2) - 1);
 
-	        if (Q1 >= 0.0) {
-		        Q1 = (pow(lambda_alpha_ntau_s, 2) - 1);
-		        Q2 =  c2_alpha * pow(Q1, 2);
-		        hat_S_alpha =  c1_alpha * Q1 * exp(Q2);
-		        hat_dS_dlambda2_alpha =  c1_alpha * exp(Q2) * (1 + 2 * Q2);
-	        }
+	    	mat3dd G = mat3dd(g_alpha_h);
+		    mat3d F = F_s*F_tau.inverse()*G;
+		    mat3ds C = (F.transpose()*F).sym();
+    		mat3ds U; mat3d R; F_tau.right_polar(R,U);
+
+		    // Copy the local element basis directions to n
+			vec3d n[2];
+		    n[0].x = 0; n[0].y = 1; n[0].z = 0;
+		    n[1].x = 0; n[1].y = 0; n[1].z = 1;
+		    
+		    // Evaluate the structural direction in the current configuration
+		    double cg = cos(eta_alpha_h); double sg = sin(eta_alpha_h);
+		    vec3d ar,a;
+		    ar = n[0]*sg + n[1]*cg;
+		    ar = R.transpose()*ar;
+
+		    a = F*ar;
+		    
+		    // Evaluate the structural tensors in the current configuration
+		    // and the fiber strains and stress contributions
+		    double I40 = (ar*(C*ar));
+		    double E0 = I40-1;
+
+		    mat3ds h0;
+		    if (E0 >= 0) {
+		        h0 = dyad(a);
+		        stress += h0*(c1_alpha*E0*exp(c2_alpha*E0*E0));
+    		}
+			if (E0 >= 0) tangent += dyad1s(h0)*(2.*c1_alpha*(1. + 2. * c2_alpha*E0*E0)*exp(c2_alpha*E0*E0));
+
 
 	    }
 	    else {
 
-	        if ( m_polymer) {
+	        if (m_polymer) {
 
 	            if ( epsilon_alpha[sn] <  epsilon_pol_min) {
 	                 epsilon_pol_min =  epsilon_alpha[sn];
@@ -170,13 +189,14 @@ public:
 	            pol_mod = 1;
 	        }
 
-	        hat_S_alpha = pol_mod *  c1_alpha;
+	    	mat3dd G = mat3dd(g_alpha_r, g_alpha_theta, g_alpha_z);
+		    mat3d  F = F_s*F_tau.inverse()*G;
+		    mat3ds b = (F*F.transpose()).sym();
+
+	        stress += pol_mod * c1_alpha * b;
 	    }
-
-	    return_constitutive = { hat_S_alpha , hat_dS_dlambda2_alpha };
-	    return return_constitutive;
-
 	}
+
 };
 
 class FEBIOMECH_API GRMaterialPoint : public FEMaterialPointData
