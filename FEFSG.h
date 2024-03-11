@@ -155,10 +155,11 @@ public:
 		    double cg = cos(eta_alpha_h); double sg = sin(eta_alpha_h);
 		    vec3d ar,a;
 		    ar = n[0]*sg + n[1]*cg;
-		    ar = R.transpose()*ar;
+
+		    ar = F_tau*ar;
+		    ar = ar/ar.norm();
 
 		    a = F*ar;
-		    
 		    // Evaluate the structural tensors in the current configuration
 		    // and the fiber strains and stress contributions
 		    double I40 = (ar*(C*ar));
