@@ -34,7 +34,6 @@ public:
     double k_alpha[MAX_TIMESTEPS];
     double rhoR_alpha[MAX_TIMESTEPS];
     double epsilonR_alpha[MAX_TIMESTEPS];
-    double lambda_alpha_tau[MAX_TIMESTEPS];
     double epsilon_alpha[MAX_TIMESTEPS];
     double K_sigma_p_alpha_h;
     double K_tauw_p_alpha_h;
@@ -77,7 +76,6 @@ public:
 	        rhoR_alpha[i] = 0;
 	        epsilonR_alpha[i] = 0;
 	        epsilon_alpha[i] = 0;
-	        lambda_alpha_tau[i] = 1;
 		}
 
         K_sigma_p_alpha_h = 0.0;
@@ -108,7 +106,6 @@ public:
 	    ar & rhoR_alpha;
 	    ar & epsilonR_alpha;
 	    ar & epsilon_alpha;
-	    ar & lambda_alpha_tau;
 	    ar & K_sigma_p_alpha_h;
 	    ar & K_tauw_p_alpha_h;
 	    ar & K_sigma_d_alpha_h;
@@ -229,10 +226,8 @@ public:
     double sigma_inv_curr;
     double rho_hat_h;
     GRConstituent m_constituents[MAX_CONSTITUENTS];
-    double m_lambda_act[MAX_TIMESTEPS];
     mat3d  m_F_s[MAX_TIMESTEPS];
     double m_J_s[MAX_TIMESTEPS];
-    double m_J_det_s[MAX_TIMESTEPS];
     double rhoR[MAX_TIMESTEPS];
     double rho[MAX_TIMESTEPS];
     double ups_infl_p[MAX_TIMESTEPS];

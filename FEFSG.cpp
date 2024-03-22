@@ -64,10 +64,8 @@ void GRMaterialPoint::Init()
 
     for (int i=0; i<MAX_TIMESTEPS; ++i)
     {
-        m_lambda_act[i] = 1.0;
         m_F_s[i] = mat3d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
         m_J_s[i] = 1.0;
-        m_J_det_s[i] = 1.0;
         rhoR[i] = 0.0;
         rho[i] = 0.0;
         ups_infl_d[i] = 0.0;
@@ -152,10 +150,8 @@ void GRMaterialPoint::Serialize(DumpStream& ar)
     ar & sigma_inv_curr;
     ar & rho_hat_h;
     ar & m_constituents;
-    ar & m_lambda_act;
     ar & m_F_s;
     ar & m_J_s;
-    ar & m_J_det_s;
     ar & rhoR;
     ar & rho;
     ar & ups_infl_p;
@@ -198,11 +194,9 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
         update_kinetics(sn);
         et.m_J_star = m_J_s[sn];
         m_F_s[sn] = m_F_curr;
-        m_J_det_s[sn] = m_J_curr;
 
         // update stretch vectors
         mat3ds C_s = (m_F_curr.transpose()*m_F_curr).sym();
-        m_lambda_act[sn] = sqrt(C_s(1, 1));
 
     } else {
         sigma_inv_h = et.m_s.tr();
@@ -241,7 +235,7 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
     mat3d Q = mat3d(e_r(mp), e_t(mp), e_z(mp));
 
     if (sn > 0){
-        pt.K_delta_sigma = 0.184*m_a_val(mp);
+        //pt.K_delta_sigma = 0.184*m_a_val(mp);
         pt.m_constituents[0].c1_alpha = pt.m_constituents[0].c1_alpha_h*(1.0 - 0.595*m_a_val(mp));
     }
 
@@ -419,6 +413,7 @@ void GRMaterialPoint::update_sigma(int sn) {
     mat3d F_s = m_F_curr;
     mat3ds C_s = (F_s.transpose()*F_s).sym();
     mat3d F_tau;
+    mat3ds C_tau;
 
     //Local active variables
     double lambda_act = 0;
@@ -460,13 +455,15 @@ void GRMaterialPoint::update_sigma(int sn) {
         q_2 = 1.0;
         mq_2 = m_constituents[alpha].mR_alpha[sn];
 
+        F_tau = m_F_s[sn];
+        C_tau = (F_tau.transpose()*F_tau).sym();
+
         //Find active radius from current cohort
         if (m_constituents[alpha].m_active == 1) {
-            lambda_act_2 = sqrt(C_s(1, 1))/m_lambda_act[sn];
+            lambda_act_2 = sqrt(C_s(1, 1)/C_tau(1,1));
             q_act_2 = 1.0;
         }
 
-        F_tau = m_F_s[sn];
         m_constituents[alpha].constitutive(F_s, F_tau, sn, hat_sigma_2, hat_CC_2);
         hat_sigma_2 = (1 / m_J_curr) * hat_sigma_2;
         hat_CC_2    = (1 / m_J_curr) * hat_CC_2;
@@ -481,13 +478,15 @@ void GRMaterialPoint::update_sigma(int sn) {
                 q_1 = exp(-(k_2 + k_1) * m_dt / 2) * q_2;
                 mq_1 = m_constituents[alpha].mR_alpha[taun] * q_1;
 
+                F_tau = m_F_s[taun];
+                C_tau = (F_tau.transpose()*F_tau).sym();
+
                 //Find intermediate active state
                 if (m_constituents[alpha].m_active == 1) {
-                    lambda_act_1 = sqrt(C_s(1, 1))/m_lambda_act[taun];
+                    lambda_act_1 = sqrt(C_s(1, 1)/C_tau(1,1));
                     q_act_1 = exp(-k_act * m_dt) * q_act_2;
                 }
 
-                F_tau = m_F_s[taun];
                 m_constituents[alpha].constitutive(F_s, F_tau, sn, hat_sigma_1, hat_CC_1);
                 hat_sigma_1 = (1 / m_J_curr) * hat_sigma_1;
                 hat_CC_1    = (1 / m_J_curr) * hat_CC_1;
@@ -547,7 +546,9 @@ void GRMaterialPoint::update_sigma(int sn) {
             if (!m_constituents[alpha].m_degradable){
                 q_act_1 = exp(-k_act * m_dt) * q_act_2;
             }
-            lambda_act += sqrt(C_s(1,1))/m_lambda_act[0] * q_act_1;
+            F_tau  = m_F_s[0];
+            C_tau = (F_tau.transpose()*F_tau).sym();
+            lambda_act += sqrt(C_s(1, 1)/C_tau(1,1)) * q_act_1;
         }
 
 
