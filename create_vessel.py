@@ -74,7 +74,7 @@ def getGeometry():
     print("Initializing cylindrical vessel...")
 
     numCirc = 20 #Must be divisible by 4!
-    numLen = 128
+    numLen = 40
     numRad = 1
     radius = 6.468e-01
     thickness = 4.02e-02
@@ -82,7 +82,7 @@ def getGeometry():
 
     half_circumfrence = False
     quarter_circumfrence = True
-    hex_8 = True
+    hex_8 = False
     hex_20 = False
     half_length = True
 
