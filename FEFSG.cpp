@@ -195,9 +195,6 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
         et.m_J_star = m_J_s[sn];
         m_F_s[sn] = m_F_curr;
 
-        // update stretch vectors
-        mat3ds C_s = (m_F_curr.transpose()*m_F_curr).sym();
-
     } else {
         sigma_inv_h = et.m_s.tr();
         bar_tauw_h = bar_tauw_curr;
@@ -235,8 +232,8 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
     mat3d Q = mat3d(e_r(mp), e_t(mp), e_z(mp));
 
     if (sn > 0){
-        //pt.K_delta_sigma = 0.184*m_a_val(mp);
-        pt.m_constituents[0].c1_alpha = pt.m_constituents[0].c1_alpha_h*(1.0 - 0.595*m_a_val(mp));
+        //pt.K_delta_sigma = m_a_val(mp);
+        pt.m_constituents[0].c1_alpha = pt.m_constituents[0].c1_alpha_h*(1.0 - m_a_val(mp));
     }
 
     pt.m_F_curr = Q.transpose() * F_bar * Q;
