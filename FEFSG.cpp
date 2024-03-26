@@ -257,7 +257,7 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
 
 
     et.m_v.x = pt.m_J_s[sn];        // Target volume 
-    et.m_v.y = pt.bar_tauw_curr;    // Aneurysm injury
+    et.m_v.y = m_a_val(mp);    // Aneurysm injury
     et.m_v.z = pt.m_sigma(2,2);     // Generally, elasticity density    
 
     et.m_a.x = pt.m_CC(0,0,0,0);     // Radial stiffness    
