@@ -163,11 +163,11 @@ public:
 		    double E0 = I40-1;
 
 		    mat3ds h0;
-		    if (E0 >= 0) {
+		    //if (E0 >= 0) {
 		        h0 = dyad(a);
 		        stress += h0*(c1_alpha*E0*exp(c2_alpha*E0*E0));
-    		}
-			if (E0 >= 0) tangent += dyad1s(h0)*(2.*c1_alpha*(1. + 2. * c2_alpha*E0*E0)*exp(c2_alpha*E0*E0));
+		        tangent += dyad1s(h0)*(2.*c1_alpha*(1. + 2. * c2_alpha*E0*E0)*exp(c2_alpha*E0*E0));
+    		//}
 
 
 	    }
