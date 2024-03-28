@@ -1,4 +1,4 @@
-//#pragma once
+#pragma once
 //=============================================================================
 // This plugin example illustrates how to create a new material. 
 // It requires FEBio 2.5 (or up)
@@ -12,27 +12,29 @@
 //-----------------------------------------------------------------------------
 // We need to include this file since our new material class will inherit from
 // FEElasticMaterial which is defined in this include files.
-#include "FEBioMech/FEElasticMaterial.h"
+#include <FEBioMech/FEUncoupledMaterial.h>
 #include <FECore/FEModelParam.h>
 #include <iostream>								// to use cin.get()
 
 class GRConstituent {
 public:
+	enum { MAX_TIMESTEPS = 2881 };
+
     double epsilon_pol_min;
     double eta_alpha_h;
     double c1_alpha_h;
     double c2_alpha_h;
+    double c1_alpha;
+    double c2_alpha;
     double g_alpha_h;
-    mat3dd G_alpha_h;
     double k_alpha_h;
     double rho_hat_alpha_h;
     double rhoR_alpha_h;
-    std::vector<double> mR_alpha;
-    std::vector<double> k_alpha;
-    std::vector<double> rhoR_alpha;
-    std::vector<double> epsilonR_alpha;
-    std::vector<double> lambda_alpha_tau;
-    std::vector<double> epsilon_alpha;
+    double mR_alpha[MAX_TIMESTEPS];
+    double k_alpha[MAX_TIMESTEPS];
+    double rhoR_alpha[MAX_TIMESTEPS];
+    double epsilonR_alpha[MAX_TIMESTEPS];
+    double epsilon_alpha[MAX_TIMESTEPS];
     double K_sigma_p_alpha_h;
     double K_tauw_p_alpha_h;
     double K_sigma_d_alpha_h;
@@ -59,17 +61,23 @@ public:
         eta_alpha_h = 0.0;
         c1_alpha_h = 0.0;
         c2_alpha_h = 0.0;
+        c1_alpha = 0.0;
+        c2_alpha = 0.0;
         g_alpha_h = 0.0;
-        G_alpha_h = mat3dd(0.0);
         k_alpha_h = 0.0;
         rho_hat_alpha_h = 0.0;
         rhoR_alpha_h = 0.0;
-        mR_alpha = std::vector<double>(720, 0.0);  // Vector of zeros of length 720
-        k_alpha = std::vector<double>(720, 0.0);   // Vector of zeros of length 720
-        rhoR_alpha = std::vector<double>(720, 0.0); // Vector of zeros of length 720
-        epsilonR_alpha = std::vector<double>(720, 0.0);  // Vector of zeros of length 720
-        epsilon_alpha = std::vector<double>(720, 0.0);  // Vector of zeros of length 720
-        lambda_alpha_tau = std::vector<double>(720, 1.0);  // Vector of zeros of length 720
+
+
+		for (int i=0; i<MAX_TIMESTEPS; ++i)
+		{
+	        mR_alpha[i] = 0;
+	        k_alpha[i] = 0;
+	        rhoR_alpha[i] = 0;
+	        epsilonR_alpha[i] = 0;
+	        epsilon_alpha[i] = 0;
+		}
+
         K_sigma_p_alpha_h = 0.0;
         K_tauw_p_alpha_h = 0.0;
         K_sigma_d_alpha_h = 0.0;
@@ -87,8 +95,9 @@ public:
 	    ar & eta_alpha_h;
 	    ar & c1_alpha_h;
 	    ar & c2_alpha_h;
+	    ar & c1_alpha;
+	    ar & c2_alpha;
 	    ar & g_alpha_h;
-	    ar & G_alpha_h;
 	    ar & k_alpha_h;
 	    ar & rho_hat_alpha_h;
 	    ar & rhoR_alpha_h;
@@ -97,7 +106,6 @@ public:
 	    ar & rhoR_alpha;
 	    ar & epsilonR_alpha;
 	    ar & epsilon_alpha;
-	    ar & lambda_alpha_tau;
 	    ar & K_sigma_p_alpha_h;
 	    ar & K_tauw_p_alpha_h;
 	    ar & K_sigma_d_alpha_h;
@@ -106,52 +114,66 @@ public:
 	    ar & m_inflammatory;
 	    ar & m_active;
 	    ar & m_polymer;
+	    ar & g_alpha_r;
+	    ar & g_alpha_theta;
+	    ar & g_alpha_z;
+	    ar & phi_alpha;
     }
 
 
-	vector<double> constitutive(int sn, int ts) {
+	void constitutive(mat3d F_s, mat3d F_tau, int sn, mat3ds& stress, tens4ds& tangent) {
 
-	    double lambda_alpha_ntau_s = 0;
-	    double Q1 = 0;
-	    double Q2 = 0;
-	    double hat_S_alpha = 0;
-	    double hat_dS_dlambda2_alpha = 0;
 	    double pol_mod = 0;
 	    double epsilon_curr = 0;
-	    vector<double> return_constitutive = { 0, 0 };
+    
+	    // Evaluate the elasticity tensor
+	    mat3dd I(1);
+	    tens4ds IxI = dyad1s(I);
+	    tens4ds I4  = dyad4s(I);
+
+	    stress = mat3ds(0.0);
+	    tangent = tens4ds(0.0);
 
 	    //Check if ansisotropic
 	    if ( eta_alpha_h >= 0) {
 
-	        lambda_alpha_ntau_s =  g_alpha_h * lambda_alpha_tau[sn] /  lambda_alpha_tau[ts];
 
-	        if (lambda_alpha_ntau_s < 1) {
-	            lambda_alpha_ntau_s = 1;
-	        }
+	    	mat3dd G = mat3dd(g_alpha_h);
+		    mat3d F = F_s*F_tau.inverse()*G;
+		    mat3ds C = (F.transpose()*F).sym();
+    		mat3ds U; mat3d R; F_tau.right_polar(R,U);
 
-	        Q1 = (pow(lambda_alpha_ntau_s, 2) - 1);
-	        Q2 =  c2_alpha_h * pow(Q1, 2);
-	        hat_S_alpha =  c1_alpha_h * Q1 * exp(Q2);
-	        hat_dS_dlambda2_alpha =  c1_alpha_h * exp(Q2) * (1 + 2 * Q2);
+		    // Copy the local element basis directions to n
+			vec3d n[2];
+		    n[0].x = 0; n[0].y = 1; n[0].z = 0;
+		    n[1].x = 0; n[1].y = 0; n[1].z = 1;
+		    
+		    // Evaluate the structural direction in the current configuration
+		    double cg = cos(eta_alpha_h); double sg = sin(eta_alpha_h);
+		    vec3d ar,a;
+		    ar = n[0]*sg + n[1]*cg;
+		    //ar = R.transpose()*ar;
+		    ar = F_tau*ar;
+		    ar = ar/ar.norm();
 
-	        /*
-			printf("sn: %d\n", sn);
-			printf("ts: %d\n", ts);
-			printf("g_alpha_h: %f\n", g_alpha_h);
-			printf("lambda_alpha_tau[sn]: %f\n", lambda_alpha_tau[sn]);
-			printf("lambda_alpha_tau[ts]: %f\n", lambda_alpha_tau[ts]);
-			printf("lambda_alpha_ntau_s: %f\n", lambda_alpha_ntau_s);
-			printf("Q1: %f\n", Q1);
-			printf("Q2: %f\n", Q2);
-			printf("hat_S_alpha: %f\n", hat_S_alpha);
-			printf("hat_dS_dlambda2_alpha: %f\n", hat_dS_dlambda2_alpha);
-			fflush(stdout);
-			*/
+		    a = F*ar;
+		    // Evaluate the structural tensors in the current configuration
+		    // and the fiber strains and stress contributions
+		    double I40 = (ar*(C*ar));
+		    double E0 = I40-1;
+
+		    mat3ds h0;
+		    //if (E0 >= 0) {
+		        h0 = dyad(a);
+		        stress += h0*(c1_alpha*E0*exp(c2_alpha*E0*E0));
+		        tangent += dyad1s(h0)*(2.*c1_alpha*(1. + 2. * c2_alpha*E0*E0)*exp(c2_alpha*E0*E0));
+    		//}
+
 
 	    }
 	    else {
 
-	        if ( m_polymer) {
+	        if (m_polymer) {
 
 	            if ( epsilon_alpha[sn] <  epsilon_pol_min) {
 	                 epsilon_pol_min =  epsilon_alpha[sn];
@@ -165,13 +187,14 @@ public:
 	            pol_mod = 1;
 	        }
 
-	        hat_S_alpha = pol_mod *  c1_alpha_h;
+	    	mat3dd G = mat3dd(g_alpha_r, g_alpha_theta, g_alpha_z);
+		    mat3d  F = F_s*F_tau.inverse()*G;
+		    mat3ds b = (F*F.transpose()).sym();
+
+	        stress += pol_mod * c1_alpha * b;
 	    }
-
-	    return_constitutive = { hat_S_alpha , hat_dS_dlambda2_alpha };
-	    return return_constitutive;
-
 	}
+
 };
 
 class FEBIOMECH_API GRMaterialPoint : public FEMaterialPointData
@@ -188,31 +211,27 @@ public:
 
 	void update_sigma(int sn);
 	void update_kinetics(int sn);
+	
+	enum { MAX_TIMESTEPS = 2881 };
+	enum { MAX_CONSTITUENTS = 6 };
 
 
 public:
-    int nts;
     int sn;
+    int m_nconstituents;
     double m_dt;
     double K_delta_tauw;
     double K_delta_sigma;
     double sigma_inv_h;
     double sigma_inv_curr;
-    std::vector<double> sigma_inv_hist;
     double rho_hat_h;
-    double m_J_curr;
-    double m_p_val_curr;
-    double m_p_val_prev;
-    std::vector<GRConstituent> m_constituents;
-    std::vector<double> m_lambda_act;
-    std::vector<mat3d> m_F_s;  // Vector of mat3d variables
-    mat3d m_F_curr;  // Vector of mat3d variables
-    mat3d m_Q;  // Vector of mat3d variables
-    std::vector<double> m_J_s;
-    std::vector<double> rhoR;
-    std::vector<double> rho;
-    std::vector<double> ups_infl_p;
-    std::vector<double> ups_infl_d;
+    GRConstituent m_constituents[MAX_CONSTITUENTS];
+    mat3d  m_F_s[MAX_TIMESTEPS];
+    double m_J_s[MAX_TIMESTEPS];
+    double rhoR[MAX_TIMESTEPS];
+    double rho[MAX_TIMESTEPS];
+    double ups_infl_p[MAX_TIMESTEPS];
+    double ups_infl_d[MAX_TIMESTEPS];
     double CB;
     double CS;
     double bar_tauw_curr;
@@ -222,6 +241,8 @@ public:
     double T_act;
     double k_act;
     mat3ds m_sigma;
+    mat3d m_F_curr;
+    double m_J_curr;
     tens4ds m_CC;
 };
 
@@ -230,7 +251,7 @@ public:
 // This material class implements a neo-Hookean constitutive model. 
 // Since it is a (compressible, coupled) hyper-elatic material, it needs to inherit
 // from FEElasticMaterial. 
-class FEFSG : public FEElasticMaterial
+class FEFSG : public FEUncoupledMaterial
 {
 public:
 	FEFSG(FEModel* pfem);
@@ -253,67 +274,31 @@ public:
 
 public:
 	// function to perform material evaluation. calculates stress and tangent to avoid code duplication
-	void StressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent, int call_type);
+	void DevStressTangent(FEMaterialPoint& mp, mat3ds& stress, tens4ds& tangent);
+
+	
 
 	// This function calculates the spatial (i.e. Cauchy or true) stress.
 	// It takes one parameter, the FEMaterialPoint and returns a mat3ds object
 	// which is a symmetric second-order tensor.
-	virtual mat3ds Stress(FEMaterialPoint& pt) override {
-		mat3ds stress;
-		tens4ds tangent;
-		StressTangent(pt, stress, tangent, 1);
-		return stress;
+	virtual mat3ds DevStress(FEMaterialPoint& pt) override {
+		mat3ds devstress;
+		tens4ds devtangent;
+		DevStressTangent(pt, devstress, devtangent);
+		return devstress;
 	}
 
 	// This function calculates the spatial elasticity tangent tensor. 
 	// It takes one parameter, the FEMaterialPoint and retursn a tens4ds object
 	// which is a fourth-order tensor with major and minor symmetries.
-	virtual tens4ds Tangent(FEMaterialPoint& pt) override {
-		mat3ds stress;
-		tens4ds tangent;
-		StressTangent(pt, stress, tangent, 0);
-		return tangent;
+	virtual tens4ds DevTangent(FEMaterialPoint& pt) override {
+		mat3ds devstress;
+		tens4ds devtangent;
+		DevStressTangent(pt, devstress, devtangent);
+		return devtangent;
 	};
 
 public:
-    // TODO: removing virtual from the following 3 functions causes changes
-    // to the convergence criteria on macOS, despite these functions not
-    // being overridden anywhere.
-	//! strain energy density U(J)
-    virtual double U(double J, double J_tar) {
-        switch (m_npmodel) {
-            case 0: return 0.5*m_K*pow(log(J/J_tar),2); break;    // FEBio default
-            case 1: return 0.25*m_K*(J/J_tar*J/J_tar - 2.0*log(J/J_tar) - 1.0); break;    // NIKE3D's Ogden material
-            case 2: return 0.5*m_K*(J/J_tar-1)*(J/J_tar-1); break;      // ABAQUS
-            case 3: return 0.5*m_K*((J/J_tar*J/J_tar-1)/2-log(J/J_tar)); break;      // ABAQUS - GOH
-            default: { assert(false); return 0; }
-        }
-    }
-	//! pressure, i.e. first derivative of U(J)
-	virtual double UJ(double J, double J_tar) {
-        switch (m_npmodel) {
-            case 0: return m_K*log(J/J_tar)/J; break;
-            case 1: return 0.5*m_K*(J/(J_tar*J_tar) - 1.0/J); break;
-            case 2: return m_K*(J/J_tar-1); break;
-            case 3: return 0.5*m_K*(J/(J_tar*J_tar)-1.0/J); break;
-			default: { assert(false); return 0; }
-		}
-    }
-
-	//! second derivative of U(J) 
-	virtual double UJJ(double J, double J_tar) {
-        switch (m_npmodel) {
-            case 0: return m_K*(1-log(J/J_tar))/(J*J); break;
-            case 1: return 0.5*m_K*(1/(J_tar*J_tar) + 1.0/(J*J)); break;
-            case 2: return m_K/J_tar; break;
-            case 3: return 0.5*m_K*(1/(J_tar*J_tar) + 1.0/(J*J)); break;
-			default: { assert(false); return 0; }
-		}
-    }
-
-public:
-	double	m_K;			//!< bulk modulus
-	int     m_npmodel;      //!< pressure model for U(J)
 	FEParamVec3     e_r;      //
 	FEParamVec3     e_t;      //
 	FEParamVec3     e_z;      //

@@ -9,7 +9,7 @@ def update_geometry(xml_file_path, xml_items):
     root = tree.getroot()
 
     # Find the Geometry tag
-    geometry_tag = root.find(".//Geometry")
+    geometry_tag = root.find(".//Mesh")
 
     # Remove existing content under Geometry tag
     geometry_tag.clear()
@@ -73,17 +73,20 @@ def getAneurysmValue(z, theta):
 def getGeometry():
     print("Initializing cylindrical vessel...")
 
-    numCirc = 24 #Must be divisible by 4!
-    numLen = 12
+    numCirc = 20 #Must be divisible by 4!
+    numLen = 40
     numRad = 1
     radius = 6.468e-01
     thickness = 4.02e-02
-    length = 6.468e-01*2
-    half = False
-    quarter = True
-    linear = False
+    length = 15
 
-    if linear == False:
+    half_circumfrence = False
+    quarter_circumfrence = True
+    hex_8 = False
+    hex_20 = False
+    half_length = True
+
+    if hex_8 == False:
         numCirc = numCirc*2 #Must be divisible by 4!
         numLen = numLen*2
         numRad = numRad*2
@@ -103,12 +106,16 @@ def getGeometry():
 
 
     maxCirc = numCirc
-    if half:
+    if half_circumfrence:
         maxCirc = numCirc//2 + 1
-    elif quarter:
+    elif quarter_circumfrence:
         maxCirc = numCirc//4 + 1
 
-    for i in range(numLen+1):
+    maxLen = numLen + 1
+    if half_length:
+        maxLen = numLen//2 + 1
+
+    for i in range(maxLen):
         for j in range(maxCirc):
             for k in range(numRad+1):
 
@@ -121,12 +128,12 @@ def getGeometry():
                 point_ids[i*(numCirc+1)*(numRad+1) + j*(numRad+1) + k] = num
                 num+=1
 
-                if half:
+                if half_circumfrence:
                     if  (j == 0 or j == 2*numCirc/4):
                         fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
                     if (j == 1*numCirc/4 or j == 3*numCirc/4) and (k == 0) and (i == 0 or i == numLen):
                         fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                elif quarter:
+                elif quarter_circumfrence:
                     if  (j == 0 or j == 2*numCirc/4):
                         fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
                     if (j == 1*numCirc/4 or j == 3*numCirc/4):
@@ -138,7 +145,7 @@ def getGeometry():
                         fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
                 
 
-    linear_coords=[
+    hex_8_coords=[
             [0, 0, 0],
             [1, 0, 0],
             [1, 1, 0],
@@ -148,7 +155,7 @@ def getGeometry():
             [1, 1, 1],
             [0, 1, 1]]
 
-    linear_quad_coords =  [
+    hex_8_quad_coords =  [
             [0, 0],
             [0, 1],
             [1, 1],
@@ -183,6 +190,28 @@ def getGeometry():
             [1, 1, 2],
             [1, 1, 1]]
 
+    hex_20_coords = [
+            [0, 0, 0],
+            [2, 0, 0],
+            [2, 2, 0],
+            [0, 2, 0],
+            [0, 0, 2],
+            [2, 0, 2],
+            [2, 2, 2],
+            [0, 2, 2],
+            [1, 0, 0],
+            [2, 1, 0],
+            [1, 2, 0],
+            [0, 1, 0],
+            [1, 0, 2],
+            [2, 1, 2],
+            [1, 2, 2],
+            [0, 1, 2],
+            [0, 0, 1],
+            [2, 0, 1],
+            [2, 2, 1],
+            [0, 2, 1]]
+
     hex_quad_coords =  [
             [0, 0],
             [0, 2],
@@ -194,23 +223,42 @@ def getGeometry():
             [1, 0],
             [1, 1]]
 
+    hex_20_quad_coords =  [
+            [0, 0],
+            [0, 2],
+            [2, 2],
+            [2, 0],
+            [0, 1],
+            [1, 2],
+            [2, 1],
+            [1, 0]]
+
 
     maxCirc = numCirc
     numJump = 2
     elem_coords = hex_coords
     quad_coords = hex_quad_coords
 
-    if linear == True:
+    if hex_8 == True:
         numJump = 1
-        elem_coords = linear_coords
-        quad_coords = linear_quad_coords
+        elem_coords = hex_8_coords
+        quad_coords = hex_8_quad_coords
 
-    if half:
+    if hex_20 == True:
+        elem_coords = hex_20_coords
+        quad_coords = hex_20_quad_coords
+
+    if half_circumfrence:
         maxCirc = numCirc//2
-    elif quarter:
+    elif quarter_circumfrence:
         maxCirc = numCirc//4
 
-    for i in range(0, numLen, numJump):
+
+    maxLen = numLen
+    if half_length:
+        maxLen = numLen//2
+
+    for i in range(0, maxLen, numJump):
         for j in range(0, maxCirc, numJump):
             for k in range(0, numRad, numJump):
 
@@ -227,7 +275,7 @@ def getGeometry():
                         quadPts.append(point_ids[(i)*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k+coord[1])])
                     fix_z.append(quadPts)
 
-                if i == numLen-numJump:
+                if i == maxLen-numJump:
                     quadPts = []
                     for coord in quad_coords:
                         quadPts.append(point_ids[(i + numJump)*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k+coord[1])])
@@ -238,6 +286,15 @@ def getGeometry():
                     for coord in quad_coords:
                         quadPts.append(point_ids[(i+coord[1])*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k)])
                     inner_surf.append(quadPts)
+
+                theta = 2.0*(j+numJump/2.)*np.pi/numCirc
+
+                xPt = np.cos(theta)
+                yPt = np.sin(theta)
+
+                zPt = length*(i+numJump/2.)/numLen - length/2.0
+
+                aneurysm_val.append(getAneurysmValue(zPt,theta))
 
 
     xml_content = []
@@ -253,8 +310,10 @@ def getGeometry():
 
     # Write Elements
     xml_object = ''
-    if linear:
+    if hex_8:
         xml_object += '\t<Elements type="hex8" mat="1" name="Part1">\n'
+    elif hex_20:
+        xml_object +=  '\t<Elements type="hex20" mat="1" name="Part1">\n'
     else:
         xml_object += '\t<Elements type="hex27" mat="1" name="Part1">\n'
     for i, element in enumerate(cells, start=1):
@@ -266,16 +325,16 @@ def getGeometry():
     # Write Surfaces
     xml_object = ''
     xml_object += '\t<NodeSet name="FixXs">\n'
-    for i, node in enumerate(fix_x, start=1):
-        xml_object += f'\t\t<node id="{node}"/>\n'
+    result_string = ', '.join(str(x) for x in fix_x)
+    xml_object += f'\t\t{result_string}\n'
     xml_object += '\t</NodeSet>\n'
     xml_content.append(ET.fromstring(xml_object))
 
 
     xml_object = ''
     xml_object += '\t<NodeSet name="FixYs">\n'
-    for i, node in enumerate(fix_y, start=1):
-        xml_object += f'\t\t<node id="{node}"/>\n'
+    result_string = ', '.join(str(x) for x in fix_y)
+    xml_object += f'\t\t{result_string}\n'
     xml_object += '\t</NodeSet>\n'
     xml_content.append(ET.fromstring(xml_object))
 
@@ -284,8 +343,10 @@ def getGeometry():
     xml_object += '\t<Surface name="FixZs">\n'
     for i, surface in enumerate(fix_z, start=1):
         str_val = ', '.join(map(str, surface))
-        if linear:
+        if hex_8:
             xml_object += f'\t\t<quad4 id="{i}">{str_val}</quad4>\n'
+        elif hex_20:
+            xml_object += f'\t\t<quad8 id="{i}">{str_val}</quad8>\n'
         else:
             xml_object += f'\t\t<quad9 id="{i}">{str_val}</quad9>\n'
     xml_object += '\t</Surface>\n'
@@ -296,8 +357,10 @@ def getGeometry():
     xml_object += '\t<Surface name="PressureLoad1">\n'
     for i, surface in enumerate(inner_surf, start=1):
         str_val = ', '.join(map(str, surface))
-        if linear:
+        if hex_8:
             xml_object += f'\t\t<quad4 id="{i}">{str_val}</quad4>\n'
+        elif hex_20:
+            xml_object += f'\t\t<quad8 id="{i}">{str_val}</quad8>\n'
         else:
             xml_object += f'\t\t<quad9 id="{i}">{str_val}</quad9>\n'
     xml_object += '\t</Surface>\n'
