@@ -4,6 +4,11 @@ import vtk
 import xml.etree.ElementTree as ET
 import argparse
 
+
+
+
+
+
 def update_geometry(xml_file_path, xml_items):
     tree = ET.parse(xml_file_path)
     root = tree.getroot()
@@ -73,6 +78,9 @@ def getAneurysmValue(z, theta):
 def getGeometry():
     print("Initializing cylindrical vessel...")
 
+    vesselType = "torus"
+    torusFraction = 0.25
+    torusRadius = 10.0
     numCirc = 20 #Must be divisible by 4!
     numLen = 40
     numRad = 1
@@ -81,10 +89,11 @@ def getGeometry():
     length = 15
 
     half_circumfrence = False
-    quarter_circumfrence = True
+    quarter_circumfrence = False
     hex_8 = False
     hex_20 = False
-    half_length = True
+    half_length = False
+
 
     if hex_8 == False:
         numCirc = numCirc*2 #Must be divisible by 4!
@@ -116,33 +125,59 @@ def getGeometry():
         maxLen = numLen//2 + 1
 
     for i in range(maxLen):
+        theta = torusFraction * 2 * np.pi * i / numLen  # Azimuthal angle (circumference)
         for j in range(maxCirc):
+            phi = -2 * np.pi * j / numCirc
             for k in range(numRad+1):
 
-                xPt = (radius + thickness*k/numRad)*np.cos(2.0*j*np.pi/numCirc)
-                yPt = (radius + thickness*k/numRad)*np.sin(2.0*j*np.pi/numCirc)
+                if vesselType == "cylinder":
+                    xPt = (radius + thickness*k/numRad)*np.cos(2.0*j*np.pi/numCirc)
+                    yPt = (radius + thickness*k/numRad)*np.sin(2.0*j*np.pi/numCirc)
+                    zPt = length*i/numLen - length/2.0
 
-                zPt = length*i/numLen - length/2.0
+                if vesselType == "torus":
+                    xPt = radius * np.sin(phi) + (np.sin(phi)*(thickness*k/numRad))
+                    yPt = (torusRadius + radius * np.cos(phi)) * np.cos(theta) + ((np.cos(phi) * np.cos(theta))*(thickness*k/numRad))
+                    zPt = (torusRadius + radius * np.cos(phi)) * np.sin(theta) + ((np.cos(phi) * np.sin(theta))*(thickness*k/numRad))
 
                 points.append([xPt, yPt, zPt])
                 point_ids[i*(numCirc+1)*(numRad+1) + j*(numRad+1) + k] = num
                 num+=1
 
-                if half_circumfrence:
-                    if  (j == 0 or j == 2*numCirc/4):
-                        fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                    if (j == 1*numCirc/4 or j == 3*numCirc/4) and (k == 0) and (i == 0 or i == numLen):
-                        fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                elif quarter_circumfrence:
-                    if  (j == 0 or j == 2*numCirc/4):
-                        fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                    if (j == 1*numCirc/4 or j == 3*numCirc/4):
-                        fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                else:
-                    if  (j == 0 or j == 2*numCirc/4) and (k == 0) and (i == 0 or i == numLen):
-                        fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                    if (j == 1*numCirc/4 or j == 3*numCirc/4) and (k == 0) and (i == 0 or i == numLen):
-                        fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                if vesselType == "cylinder":
+                    if half_circumfrence:
+                        if  (j == 0 or j == 2*numCirc/4):
+                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (j == 1*numCirc/4 or j == 3*numCirc/4) and (k == 0) and (i == 0 or i == numLen):
+                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                    elif quarter_circumfrence:
+                        if  (j == 0 or j == 2*numCirc/4):
+                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (j == 1*numCirc/4 or j == 3*numCirc/4):
+                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                    else:
+                        if  (j == 0 or j == 2*numCirc/4) and (k == 0) and (i == 0 or i == numLen):
+                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (j == 1*numCirc/4 or j == 3*numCirc/4) and (k == 0) and (i == 0 or i == numLen):
+                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+
+                if vesselType == "torus":
+                    if half_circumfrence:
+                        if  (j == 0 or j == 2*numCirc/4):
+                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (j == 1*numCirc/4 or j == 3*numCirc/4) and (k == 0) and (i == 0 or i == numLen):
+                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                    elif quarter_circumfrence:
+                        if  (j == 0 or j == 2*numCirc/4):
+                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (j == 1*numCirc/4 or j == 3*numCirc/4):
+                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                    else:
+                        if  (j == 0 or j == 2*numCirc/4) and (k == 0) and (i == 0 or i == numLen):
+                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (j == 1*numCirc/4 or j == 3*numCirc/4) and (k == 0) and (i == 0 or i == numLen):
+                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+
                 
 
     hex_8_coords=[
@@ -287,13 +322,11 @@ def getGeometry():
                         quadPts.append(point_ids[(i+coord[1])*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k)])
                     inner_surf.append(quadPts)
 
-                theta = 2.0*(j+numJump/2.)*np.pi/numCirc
 
+                theta = 2.0*(j+numJump/2.)*np.pi/numCirc
                 xPt = np.cos(theta)
                 yPt = np.sin(theta)
-
                 zPt = length*(i+numJump/2.)/numLen - length/2.0
-
                 aneurysm_val.append(getAneurysmValue(zPt,theta))
 
 
