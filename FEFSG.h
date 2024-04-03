@@ -149,12 +149,22 @@ public:
 		    n[1].x = 0; n[1].y = 0; n[1].z = 1;
 		    
 		    // Evaluate the structural direction in the current configuration
-		    double cg = cos(eta_alpha_h); double sg = sin(eta_alpha_h);
 		    vec3d ar,a;
+
+			double lth = (F_tau * n[0]).norm();	// lth -> 1 for Fh -> Fo
+			double lzh = (F_tau * n[1]).norm();	// lzh -> 1 for Fh -> Fo
+
+			double eta_alpha_curr = eta_alpha_h;
+			//double aexp = 1.0;
+			//if ((eta_alpha_h != 0.0) and (eta_alpha_curr != PI/2)){
+			//	eta_alpha_curr = atan(tan(eta_alpha_h)*pow(lth/lzh,aexp));	// Remodeled angle
+			//}
+
+		    double cg = cos(eta_alpha_curr); double sg = sin(eta_alpha_curr);
 		    ar = n[0]*sg + n[1]*cg;
-		    //ar = R.transpose()*ar;
-		    ar = F_tau*ar;
-		    ar = ar/ar.norm();
+		    ar = R.transpose()*ar;
+		    //ar = F_tau*ar;
+		    //ar = ar/ar.norm();
 
 		    a = F*ar;
 		    // Evaluate the structural tensors in the current configuration
@@ -302,7 +312,8 @@ public:
 	FEParamVec3     e_r;      //
 	FEParamVec3     e_t;      //
 	FEParamVec3     e_z;      //
-	FEParamDouble     m_a_val;      //!< K_delta_sigma
+	FEParamDouble     m_e_injury_val;      //!< K_delta_sigma
+	FEParamDouble     m_k_injury_val;      //!< K_delta_sigma
 
     DECLARE_FECORE_CLASS();
 
