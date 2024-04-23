@@ -12,7 +12,8 @@
 
 // define the material parameters
 BEGIN_FECORE_CLASS(FEFSG, FEUncoupledMaterial)
-    ADD_PARAMETER(m_a_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "a_val");
+    ADD_PARAMETER(m_e_injury_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "e_injury_val");
+    ADD_PARAMETER(m_k_injury_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "k_injury_val");
     ADD_PARAMETER(e_r , "e_r");
     ADD_PARAMETER(e_t , "e_t");
     ADD_PARAMETER(e_z , "e_z");
@@ -24,7 +25,8 @@ FEFSG::FEFSG(FEModel* pfem) : FEUncoupledMaterial(pfem)
     m_K = 0;    // invalid value!
     m_npmodel = 0;
     //m_secant_tangent = true;
-    m_a_val = 0;
+    m_e_injury_val = 0;
+    m_k_injury_val = 0;
     e_r = vec3d(1,0,0);
     e_t = vec3d(0,1,0);
     e_z = vec3d(0,0,1);
@@ -192,6 +194,7 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
         sigma_inv_curr = et.m_s.tr();
 
         update_kinetics(sn);
+
         et.m_J_star = m_J_s[sn];
         m_F_s[sn] = m_F_curr;
 
@@ -232,8 +235,8 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
     mat3d Q = mat3d(e_r(mp), e_t(mp), e_z(mp));
 
     if (sn > 0){
-        //pt.K_delta_sigma = m_a_val(mp);
-        pt.m_constituents[0].c1_alpha = pt.m_constituents[0].c1_alpha_h*(1.0 - m_a_val(mp));
+        pt.K_delta_sigma = m_k_injury_val(mp);
+        pt.m_constituents[0].c1_alpha = pt.m_constituents[0].c1_alpha_h*(1.0 - m_e_injury_val(mp));
     }
 
     pt.m_F_curr = Q.transpose() * F_bar * Q;
@@ -257,7 +260,7 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
 
 
     et.m_v.x = pt.m_J_s[sn];        // Target volume 
-    et.m_v.y = m_a_val(mp);    // Aneurysm injury
+    et.m_v.y = m_e_injury_val(mp);    // Aneurysm injury
     et.m_v.z = pt.m_sigma(2,2);     // Generally, elasticity density    
 
     et.m_a.x = pt.m_CC(0,0,0,0);     // Radial stiffness    

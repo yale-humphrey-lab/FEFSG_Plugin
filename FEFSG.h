@@ -18,7 +18,7 @@
 
 class GRConstituent {
 public:
-	enum { MAX_TIMESTEPS = 2881 };
+	enum { MAX_TIMESTEPS = 5761 };
 
     double epsilon_pol_min;
     double eta_alpha_h;
@@ -141,7 +141,7 @@ public:
 	    	mat3dd G = mat3dd(g_alpha_h);
 		    mat3d F = F_s*F_tau.inverse()*G;
 		    mat3ds C = (F.transpose()*F).sym();
-    		mat3ds U; mat3d R; F_tau.right_polar(R,U);
+    		//mat3ds U; mat3d R; F_tau.right_polar(R,U);
 
 		    // Copy the local element basis directions to n
 			vec3d n[2];
@@ -149,8 +149,18 @@ public:
 		    n[1].x = 0; n[1].y = 0; n[1].z = 1;
 		    
 		    // Evaluate the structural direction in the current configuration
-		    double cg = cos(eta_alpha_h); double sg = sin(eta_alpha_h);
 		    vec3d ar,a;
+
+			double lth = (F_tau * n[0]).norm();	// lth -> 1 for Fh -> Fo
+			double lzh = (F_tau * n[1]).norm();	// lzh -> 1 for Fh -> Fo
+
+			double eta_alpha_curr = eta_alpha_h;
+			//double aexp = 1.0;
+			//if ((eta_alpha_h != 0.0) and (eta_alpha_curr != PI/2)){
+			//	eta_alpha_curr = atan(tan(eta_alpha_h)*pow(lth/lzh,aexp));	// Remodeled angle
+			//}
+
+		    double cg = cos(eta_alpha_curr); double sg = sin(eta_alpha_curr);
 		    ar = n[0]*sg + n[1]*cg;
 		    //ar = R.transpose()*ar;
 		    ar = F_tau*ar;
@@ -212,7 +222,7 @@ public:
 	void update_sigma(int sn);
 	void update_kinetics(int sn);
 	
-	enum { MAX_TIMESTEPS = 2881 };
+	enum { MAX_TIMESTEPS = 5761 };
 	enum { MAX_CONSTITUENTS = 6 };
 
 
@@ -302,7 +312,8 @@ public:
 	FEParamVec3     e_r;      //
 	FEParamVec3     e_t;      //
 	FEParamVec3     e_z;      //
-	FEParamDouble     m_a_val;      //!< K_delta_sigma
+	FEParamDouble     m_e_injury_val;      //!< K_delta_sigma
+	FEParamDouble     m_k_injury_val;      //!< K_delta_sigma
 
     DECLARE_FECORE_CLASS();
 
