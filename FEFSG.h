@@ -18,7 +18,7 @@
 
 class GRConstituent {
 public:
-	enum { MAX_TIMESTEPS = 2881 };
+	enum { MAX_TIMESTEPS = 5761 };
 
     double epsilon_pol_min;
     double eta_alpha_h;
@@ -141,7 +141,7 @@ public:
 	    	mat3dd G = mat3dd(g_alpha_h);
 		    mat3d F = F_s*F_tau.inverse()*G;
 		    mat3ds C = (F.transpose()*F).sym();
-    		mat3ds U; mat3d R; F_tau.right_polar(R,U);
+    		//mat3ds U; mat3d R; F_tau.right_polar(R,U);
 
 		    // Copy the local element basis directions to n
 			vec3d n[2];
@@ -162,9 +162,9 @@ public:
 
 		    double cg = cos(eta_alpha_curr); double sg = sin(eta_alpha_curr);
 		    ar = n[0]*sg + n[1]*cg;
-		    ar = R.transpose()*ar;
-		    //ar = F_tau*ar;
-		    //ar = ar/ar.norm();
+		    //ar = R.transpose()*ar;
+		    ar = F_tau*ar;
+		    ar = ar/ar.norm();
 
 		    a = F*ar;
 		    // Evaluate the structural tensors in the current configuration
@@ -222,7 +222,7 @@ public:
 	void update_sigma(int sn);
 	void update_kinetics(int sn);
 	
-	enum { MAX_TIMESTEPS = 2881 };
+	enum { MAX_TIMESTEPS = 5761 };
 	enum { MAX_CONSTITUENTS = 6 };
 
 
