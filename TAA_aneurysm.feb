@@ -9,14 +9,14 @@
       <diverge_reform>1</diverge_reform>
       <reform_each_time_step>1</reform_each_time_step>
       <dtol>0</dtol>
-      <etol>1e-16</etol>
-      <rtol>1e-16</rtol>
+      <etol>1e-12</etol>
+      <rtol>1e-12</rtol>
       <lstol>0.0</lstol>
-      <min_residual>1e-16</min_residual>
+      <min_residual>1e-12</min_residual>
       <rhoi>0</rhoi>
       <linear_solver type="mkl_dss" />
       <max_refs>1000</max_refs>
-      <qn_method type="Broyden">
+      <qn_method type="BFGS">
         <max_ups>0</max_ups>
       </qn_method>
       <symmetric_stiffness>0</symmetric_stiffness>
@@ -33,7 +33,7 @@
     <material id="1" name="Material1" type="FSG">
       <density>1</density>
       <k>1000.0</k>
-      <e_injury_val lc="2" type="math"> 0.04 + 0.36 * exp(-abs((Z - 0.0) / 3.0) ^ 5.0)</e_injury_val>
+      <elastin_injury_val lc="2" type="math"> 0.62 * exp(-abs((Z - 0.0) / 3.0) ^ 5.0)</elastin_injury_val>
       <e_r type="math"> X/sqrt(X^2 + Y^2), Y/sqrt(X^2 + Y^2), 0 </e_r>
       <e_t type="math"> -Y/sqrt(X^2 + Y^2), X/sqrt(X^2 + Y^2), 0 </e_t>
       <e_z type="math"> 0, 0, 1 </e_z>
@@ -1498,17 +1498,18 @@
 		31, 32, 33, 64, 65, 66, 97, 98, 99, 130, 131, 132, 163, 164, 165, 196, 197, 198, 229, 230, 231, 262, 263, 264, 295, 296, 297, 328, 329, 330, 361, 362, 363, 394, 395, 396, 427, 428, 429, 460, 461, 462, 493, 494, 495, 526, 527, 528, 559, 560, 561, 592, 593, 594, 625, 626, 627, 658, 659, 660, 691, 692, 693, 724, 725, 726, 757, 758, 759, 790, 791, 792, 823, 824, 825, 856, 857, 858, 889, 890, 891, 922, 923, 924, 955, 956, 957, 988, 989, 990, 1021, 1022, 1023, 1054, 1055, 1056, 1087, 1088, 1089, 1120, 1121, 1122, 1153, 1154, 1155, 1186, 1187, 1188, 1219, 1220, 1221, 1252, 1253, 1254, 1285, 1286, 1287, 1318, 1319, 1320, 1351, 1352, 1353
 	</NodeSet><NodeSet name="FixYs">
 		1, 2, 3, 34, 35, 36, 67, 68, 69, 100, 101, 102, 133, 134, 135, 166, 167, 168, 199, 200, 201, 232, 233, 234, 265, 266, 267, 298, 299, 300, 331, 332, 333, 364, 365, 366, 397, 398, 399, 430, 431, 432, 463, 464, 465, 496, 497, 498, 529, 530, 531, 562, 563, 564, 595, 596, 597, 628, 629, 630, 661, 662, 663, 694, 695, 696, 727, 728, 729, 760, 761, 762, 793, 794, 795, 826, 827, 828, 859, 860, 861, 892, 893, 894, 925, 926, 927, 958, 959, 960, 991, 992, 993, 1024, 1025, 1026, 1057, 1058, 1059, 1090, 1091, 1092, 1123, 1124, 1125, 1156, 1157, 1158, 1189, 1190, 1191, 1222, 1223, 1224, 1255, 1256, 1257, 1288, 1289, 1290, 1321, 1322, 1323
-	</NodeSet><Surface name="FixZs">
+	</NodeSet><Surface name="FixZsProximal">
 		<quad9 id="1">1, 3, 9, 7, 2, 6, 8, 4, 5</quad9>
 		<quad9 id="2">7, 9, 15, 13, 8, 12, 14, 10, 11</quad9>
 		<quad9 id="3">13, 15, 21, 19, 14, 18, 20, 16, 17</quad9>
 		<quad9 id="4">19, 21, 27, 25, 20, 24, 26, 22, 23</quad9>
 		<quad9 id="5">25, 27, 33, 31, 26, 30, 32, 28, 29</quad9>
-		<quad9 id="6">1321, 1323, 1329, 1327, 1322, 1326, 1328, 1324, 1325</quad9>
-		<quad9 id="7">1327, 1329, 1335, 1333, 1328, 1332, 1334, 1330, 1331</quad9>
-		<quad9 id="8">1333, 1335, 1341, 1339, 1334, 1338, 1340, 1336, 1337</quad9>
-		<quad9 id="9">1339, 1341, 1347, 1345, 1340, 1344, 1346, 1342, 1343</quad9>
-		<quad9 id="10">1345, 1347, 1353, 1351, 1346, 1350, 1352, 1348, 1349</quad9>
+	</Surface><Surface name="FixZsDistal">
+		<quad9 id="1">1321, 1323, 1329, 1327, 1322, 1326, 1328, 1324, 1325</quad9>
+		<quad9 id="2">1327, 1329, 1335, 1333, 1328, 1332, 1334, 1330, 1331</quad9>
+		<quad9 id="3">1333, 1335, 1341, 1339, 1334, 1338, 1340, 1336, 1337</quad9>
+		<quad9 id="4">1339, 1341, 1347, 1345, 1340, 1344, 1346, 1342, 1343</quad9>
+		<quad9 id="5">1345, 1347, 1353, 1351, 1346, 1350, 1352, 1348, 1349</quad9>
 	</Surface><Surface name="PressureLoad1">
 		<quad9 id="1">1, 67, 73, 7, 34, 70, 40, 4, 37</quad9>
 		<quad9 id="2">7, 73, 79, 13, 40, 76, 46, 10, 43</quad9>
@@ -1613,7 +1614,7 @@
 	</Surface></Mesh><MeshDomains>
     <SolidDomain name="Part1" mat="Material1">
       <laugon>1</laugon>
-      <atol>1e-3</atol>
+      <atol>1e-2</atol>
       <minaug>0</minaug>
       <maxaug>0</maxaug>
     </SolidDomain>
@@ -1624,7 +1625,12 @@
       <y_dof>1</y_dof>
       <z_dof>0</z_dof>
     </bc>
-    <bc name="FixZs" type="zero displacement" node_set="@surface:FixZs">
+    <bc name="FixZs" type="zero displacement" node_set="@surface:FixZsDistal">
+      <x_dof>0</x_dof>
+      <y_dof>0</y_dof>
+      <z_dof>1</z_dof>
+    </bc>
+    <bc name="FixZs" type="zero displacement" node_set="@surface:FixZsProximal">
       <x_dof>0</x_dof>
       <y_dof>0</y_dof>
       <z_dof>1</z_dof>
