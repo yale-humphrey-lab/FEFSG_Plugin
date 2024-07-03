@@ -27,6 +27,7 @@ public:
     double c1_alpha;
     double c2_alpha;
     double g_alpha_h;
+    double g_alpha;
     double k_alpha_h;
     double rho_hat_alpha_h;
     double rhoR_alpha_h;
@@ -64,6 +65,7 @@ public:
         c1_alpha = 0.0;
         c2_alpha = 0.0;
         g_alpha_h = 0.0;
+        g_alpha = 0.0;
         k_alpha_h = 0.0;
         rho_hat_alpha_h = 0.0;
         rhoR_alpha_h = 0.0;
@@ -98,6 +100,7 @@ public:
 	    ar & c1_alpha;
 	    ar & c2_alpha;
 	    ar & g_alpha_h;
+	    ar & g_alpha;
 	    ar & k_alpha_h;
 	    ar & rho_hat_alpha_h;
 	    ar & rhoR_alpha_h;
@@ -138,7 +141,7 @@ public:
 	    if ( eta_alpha_h >= 0) {
 
 
-	    	mat3dd G = mat3dd(g_alpha_h);
+	    	mat3dd G = mat3dd(g_alpha);
 		    mat3d F = F_s*F_tau.inverse()*G;
 		    mat3ds C = (F.transpose()*F).sym();
     		//mat3ds U; mat3d R; F_tau.right_polar(R,U);
@@ -312,8 +315,10 @@ public:
 	FEParamVec3     e_r;      //
 	FEParamVec3     e_t;      //
 	FEParamVec3     e_z;      //
-	FEParamDouble     m_e_injury_val;      //!< K_delta_sigma
-	FEParamDouble     m_k_injury_val;      //!< K_delta_sigma
+	FEParamDouble     m_elastin_injury_val;      //!< K_delta_sigma
+	FEParamDouble     m_crosslinking_injury_val;      //!< K_delta_sigma
+	FEParamDouble     m_mechanosensing_injury_val;      //!< K_delta_sigma
+	FEParamDouble     m_mechanoregulation_injury_val;      //!< K_delta_sigma
 
     DECLARE_FECORE_CLASS();
 
