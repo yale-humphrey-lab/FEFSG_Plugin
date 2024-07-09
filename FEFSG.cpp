@@ -193,7 +193,7 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
     const double dt = timeInfo.timeIncrement;
     const int n_iter = timeInfo.currentRestart;
 
-    double omega = double(n_iter)/100.0;
+    double omega = double(n_iter)/10.0;
     if (omega > 1.0) {
         omega = 1.0;
     }
@@ -342,12 +342,16 @@ void GRMaterialPoint::update_kinetics(int sn) {
 
                 upsilon_d = 1 + K_sigma_d * delta_sigma - K_tauw_p * delta_tauw;
 
+                rhoR_alpha_calc = m_constituents[alpha].rhoR_alpha[sn];
+
+                /* FOR TEVG
                 if (m_constituents[alpha].rhoR_alpha[sn] <= m_constituents[alpha].rhoR_alpha_h) {
                     rhoR_alpha_calc = m_constituents[alpha].rhoR_alpha_h;
                 }
                 else {
                     rhoR_alpha_calc = m_constituents[alpha].rhoR_alpha[sn];
                 }
+                */
             }
             else {
 
