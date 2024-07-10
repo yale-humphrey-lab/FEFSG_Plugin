@@ -206,10 +206,13 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
 
         update_kinetics(sn);
 
+        // Ramp Jacobian to prevent numerical issues
         et.m_J_star = et.m_J_star * (1.0 - omega) +  omega * m_J_s[sn];
         m_F_s[sn] = m_F_curr;
 
     } else {
+
+        sigma_inv_curr = et.m_s.tr();
         sigma_inv_h = et.m_s.tr();
     }
 
