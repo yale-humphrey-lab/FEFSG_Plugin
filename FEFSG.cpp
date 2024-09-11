@@ -285,11 +285,11 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
 
     et.m_v.x = pt.m_J_s[sn];        // Target volume 
     et.m_v.y = m_elastin_injury_val(mp);    // Aneurysm injury
-    et.m_v.z = pt.sigma_inv_curr;     // Generally, elasticity density    
+    et.m_v.z = pt.m_W;     // Generally, elasticity density    
 
-    et.m_a.x = pt.m_CC(0,0,0,0);     // Radial stiffness    
-    et.m_a.y = pt.m_CC(1,1,1,1);     // Circumfrential stiffness    
-    et.m_a.z = pt.m_CC(2,2,2,2);     // Axial stiffness
+    et.m_a.x = pt.m_CC(0,0,0,0) + 2.0 *  pt.m_sigma(0,0);     // Radial stiffness    
+    et.m_a.y = pt.m_CC(1,1,1,1) + 2.0 *  pt.m_sigma(1,1);     // Circumfrential stiffness    
+    et.m_a.z = pt.m_CC(2,2,2,2) + 2.0 *  pt.m_sigma(2,2);     // Axial stiffness
 
 }
 
@@ -629,6 +629,7 @@ void GRMaterialPoint::update_sigma(int sn) {
 
     }
 
+    m_W = W;
     m_sigma = sigma;
     m_CC = CC;
 
