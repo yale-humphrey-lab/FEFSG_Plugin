@@ -124,7 +124,7 @@ public:
     }
 
 
-	void constitutive(mat3d F_s, mat3d F_tau, int sn, mat3ds& stress, tens4ds& tangent) {
+	void constitutive(mat3d F_s, mat3d F_tau, int sn, double& energy, mat3ds& stress, tens4ds& tangent) {
 
 	    double pol_mod = 0;
 	    double epsilon_curr = 0;
@@ -134,6 +134,7 @@ public:
 	    tens4ds IxI = dyad1s(I);
 	    tens4ds I4  = dyad4s(I);
 
+	    energy = 0.0;
 	    stress = mat3ds(0.0);
 	    tangent = tens4ds(0.0);
 
@@ -154,10 +155,10 @@ public:
 		    // Evaluate the structural direction in the current configuration
 		    vec3d ar,a;
 
-			double lth = (F_tau * n[0]).norm();	// lth -> 1 for Fh -> Fo
-			double lzh = (F_tau * n[1]).norm();	// lzh -> 1 for Fh -> Fo
-
 			double eta_alpha_curr = eta_alpha_h;
+
+			//double lth = (F_tau * n[0]).norm();	// lth -> 1 for Fh -> Fo
+			//double lzh = (F_tau * n[1]).norm();	// lzh -> 1 for Fh -> Fo
 			//double aexp = 1.0;
 			//if ((eta_alpha_h != 0.0) and (eta_alpha_curr != PI/2)){
 			//	eta_alpha_curr = atan(tan(eta_alpha_h)*pow(lth/lzh,aexp));	// Remodeled angle
@@ -178,6 +179,7 @@ public:
 		    mat3ds h0;
 		    //if (E0 >= 0) {
 		        h0 = dyad(a);
+		        energy += c1_alpha/(4.0*c2_alpha)*(exp(c2_alpha*E0*E0)-1.0);
 		        stress += h0*(c1_alpha*E0*exp(c2_alpha*E0*E0));
 		        tangent += dyad1s(h0)*(2.*c1_alpha*(1. + 2. * c2_alpha*E0*E0)*exp(c2_alpha*E0*E0));
     		//}
@@ -204,6 +206,7 @@ public:
 		    mat3d  F = F_s*F_tau.inverse()*G;
 		    mat3ds b = (F*F.transpose()).sym();
 
+		    energy += c1_alpha/2.0*(F.dotdot(F)-3.0);
 	        stress += pol_mod * c1_alpha * b;
 	    }
 	}
@@ -251,8 +254,10 @@ public:
     double bar_tauw_h;
     double lambda_m;
     double lambda_0;
+    double lambda_m_act;
     double T_act;
     double k_act;
+    double m_W;
     mat3ds m_sigma;
     mat3d m_F_curr;
     double m_J_curr;

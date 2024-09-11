@@ -60,8 +60,10 @@ void GRMaterialPoint::Init()
     bar_tauw_h = 0.0;
     lambda_m = 0.0;
     lambda_0 = 0.0;
+    lambda_m_act = 1.0;
     T_act = 0.0;
     k_act = 0.0;
+    m_W = 0.0;
     m_sigma = mat3ds(0.0);
     m_F_curr = mat3d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
     m_J_curr = 1.0;
@@ -299,7 +301,7 @@ void GRMaterialPoint::update_kinetics(int sn) {
 
     //Differences in current mechanical state from the reference state
     //Stress invariant
-    double delta_sigma = ((1 - K_delta_sigma) * (sigma_inv_curr / sigma_inv_h)) - 1;
+    double delta_sigma = (sigma_inv_curr / sigma_inv_h) - 1;
 
     //Wall shear stress
     //TODO implement shear stress
@@ -338,12 +340,12 @@ void GRMaterialPoint::update_kinetics(int sn) {
                 K_tauw_d = m_constituents[alpha].K_tauw_d_alpha_h;
 
                 //Update the stimulus functions for each constituent
-                upsilon_p = 1 + K_sigma_p * delta_sigma - K_tauw_p * delta_tauw;
+                upsilon_p = 1 + (1 - K_delta_sigma) * K_sigma_p * delta_sigma - K_tauw_p * delta_tauw;
                 //if (upsilon_p < 0.1) {
                 //    upsilon_p = 0.1;
                 //}
 
-                upsilon_d = 1 + K_sigma_d * delta_sigma - K_tauw_p * delta_tauw;
+                upsilon_d = 1 + K_sigma_d * pow(delta_sigma, 2) + K_tauw_d * pow(delta_tauw, 2);
 
                 rhoR_alpha_calc = m_constituents[alpha].rhoR_alpha[sn];
 
@@ -447,7 +449,7 @@ void GRMaterialPoint::update_sigma(int sn) {
     double lambda_act_1 = 0;
     double lambda_act_2 = 0;
     double parab_act = 0;
-    double hat_sigma_act = 0, sigma_act = 0, S_act = 0, dSdC_act = 0, C = 0;
+    double hat_sigma_act = 0, sigma_act = 0, dSdC_act = 0, C = 0;
     mat3ds sigma_act_mat(0);
     double Cbar_act = 0;
 
@@ -461,6 +463,12 @@ void GRMaterialPoint::update_sigma(int sn) {
     mat3ds sigma(0);
     mat3ds hat_sigma_1(0);
     mat3ds hat_sigma_2(0);
+
+    //Energy doubles
+    double W = 0.0;
+    double hat_W_1 = 0.0;
+    double hat_W_2 = 0.0;
+
     //For active stress
     double q_act_1 = 0, q_act_2 = 0;
 
@@ -487,13 +495,14 @@ void GRMaterialPoint::update_sigma(int sn) {
 
         //Find active radius from current cohort
         if (m_constituents[alpha].m_active == 1) {
-            lambda_act_2 = sqrt(C_s(1, 1)/C_tau(1,1));
+            lambda_act_2 = m_F_s[sn](1, 1);
             q_act_2 = 1.0;
         }
 
-        m_constituents[alpha].constitutive(F_s, F_tau, sn, hat_sigma_2, hat_CC_2);
-        hat_sigma_2 = (1 / m_J_curr) * hat_sigma_2;
-        hat_CC_2    = (1 / m_J_curr) * hat_CC_2;
+        m_constituents[alpha].constitutive(F_s, F_tau, sn, hat_W_2, hat_sigma_2, hat_CC_2);
+        hat_W_2     = (1. / m_J_curr) * hat_W_2;
+        hat_sigma_2 = (1. / m_J_curr) * hat_sigma_2;
+        hat_CC_2    = (1. / m_J_curr) * hat_CC_2;
 
         //Check if during G&R or at initial time point
         if (sn > 0 && m_constituents[alpha].m_degradable) {
@@ -510,15 +519,17 @@ void GRMaterialPoint::update_sigma(int sn) {
 
                 //Find intermediate active state
                 if (m_constituents[alpha].m_active == 1) {
-                    lambda_act_1 = sqrt(C_s(1, 1)/C_tau(1,1));
+                    lambda_act_1 = m_F_s[taun](1, 1);
                     q_act_1 = exp(-k_act * m_dt) * q_act_2;
                 }
 
-                m_constituents[alpha].constitutive(F_s, F_tau, sn, hat_sigma_1, hat_CC_1);
-                hat_sigma_1 = (1 / m_J_curr) * hat_sigma_1;
-                hat_CC_1    = (1 / m_J_curr) * hat_CC_1;
+                m_constituents[alpha].constitutive(F_s, F_tau, sn, hat_W_1, hat_sigma_1, hat_CC_1);
+                hat_W_1     = (1. / m_J_curr) * hat_W_1;
+                hat_sigma_1 = (1. / m_J_curr) * hat_sigma_1;
+                hat_CC_1    = (1. / m_J_curr) * hat_CC_1;
 
                 // Add integration contribution
+                W     += (mq_2 * hat_W_2 + mq_1 * hat_W_1) / m_constituents[alpha].rho_hat_alpha_h * m_dt / 2;
                 sigma += (mq_2 * hat_sigma_2 + mq_1 * hat_sigma_1) / m_constituents[alpha].rho_hat_alpha_h * m_dt / 2;
                 CC    += (mq_2 * hat_CC_2    + mq_1 * hat_CC_1)    / m_constituents[alpha].rho_hat_alpha_h * m_dt / 2;
 
@@ -536,6 +547,7 @@ void GRMaterialPoint::update_sigma(int sn) {
                 mq_2 = mq_1;
 
                 //Store intermediate stress and stiffness for next iteration
+                hat_W_2     = hat_W_1;
                 hat_sigma_2 = hat_sigma_1;
                 hat_CC_2    = hat_CC_1;
 
@@ -543,11 +555,21 @@ void GRMaterialPoint::update_sigma(int sn) {
 
             // Add in the stress and stiffness contributions of the initial material
             if (taun_min == 0) {
+                W += m_constituents[alpha].rhoR_alpha[0]
+                    / m_constituents[alpha].rho_hat_alpha_h * q_1 * hat_W_1;
+
                 sigma += m_constituents[alpha].rhoR_alpha[0]
                     / m_constituents[alpha].rho_hat_alpha_h * q_1 * hat_sigma_1;
 
                 CC += m_constituents[alpha].rhoR_alpha[0]
                     / m_constituents[alpha].rho_hat_alpha_h * q_1 * hat_CC_1;
+
+                if (m_constituents[alpha].m_active == 1) {
+                    if (!m_constituents[alpha].m_degradable){
+                        q_act_1 = exp(-k_act * m_dt) * q_act_2;
+                    }
+                    lambda_act += m_F_s[0](1, 1) * q_act_1;
+                }
             }
 
         }
@@ -555,9 +577,14 @@ void GRMaterialPoint::update_sigma(int sn) {
         else {
             F_tau  = m_F_s[0];
 
-            m_constituents[alpha].constitutive(F_s, F_tau, sn, hat_sigma_2, hat_CC_2);
-            hat_sigma_2 = (1 / m_J_curr) * hat_sigma_2;
-            hat_CC_2    = (1 / m_J_curr) * hat_CC_2;
+            m_constituents[alpha].constitutive(F_s, F_tau, sn, hat_W_2, hat_sigma_2, hat_CC_2);
+            hat_W_2     = (1. / m_J_curr) * hat_W_2;
+            hat_sigma_2 = (1. / m_J_curr) * hat_sigma_2;
+            hat_CC_2    = (1. / m_J_curr) * hat_CC_2;
+
+            // Add in stress and stiffness contributions
+            W += m_constituents[alpha].rhoR_alpha[sn] /
+                m_constituents[alpha].rho_hat_alpha_h * hat_W_2;
 
             // Add in stress and stiffness contributions
             sigma += m_constituents[alpha].rhoR_alpha[sn] /
@@ -566,41 +593,29 @@ void GRMaterialPoint::update_sigma(int sn) {
             CC += m_constituents[alpha].rhoR_alpha[sn] /
                 m_constituents[alpha].rho_hat_alpha_h * hat_CC_2;
 
-        }
-
-
-        if (taun_min == 0 && m_constituents[alpha].m_active == 1) {
-            if (!m_constituents[alpha].m_degradable){
-                q_act_1 = exp(-k_act * m_dt) * q_act_2;
-            }
-            F_tau  = m_F_s[0];
-            C_tau = (F_tau.transpose()*F_tau).sym();
-            lambda_act += sqrt(C_s(1, 1)/C_tau(1,1)) * q_act_1;
+            lambda_act = lambda_act_2;
         }
 
 
         if (m_constituents[alpha].m_active == 1) {
         
+
+            lambda_m_act = m_F_s[sn](1, 1)/lambda_act;
+
+            vec3d Nc = vec3d(0.,1.,0.)/(F_s*vec3d(0.,1.,0.)).norm();
+
             //Find active stress contribtion
             //add in initial active stress radius contribution
             C = CB - CS * (bar_tauw_curr / bar_tauw_h - 1);
+            parab_act = (1.0-pow((lambda_m-lambda_m_act)/(lambda_m-lambda_0),2));
 
-            if (sn == 0) {
-                C = CB;
-                lambda_act = 1.0;
-            }
-
-            parab_act = 1 - pow((lambda_m - lambda_act) / (lambda_m - lambda_0), 2);
-
-            S_act = T_act * (1 - exp(-pow(C, 2))) * pow(lambda_act, -1) * parab_act *
-                    m_constituents[alpha].rhoR_alpha[sn] / m_constituents[alpha].rho_hat_alpha_h;
-
+            mat3d S_act = T_act * (1 - exp(-pow(C, 2))) * lambda_m_act * parab_act * dyad(Nc) * m_constituents[alpha].rhoR_alpha[sn] / m_constituents[alpha].rho_hat_alpha_h;
 
             dSdC_act = T_act *  (1 - exp(-pow(C, 2))) * (1/lambda_act) *
                        ((-1/pow(lambda_act,2))*parab_act + 2*(1/lambda_act)*(lambda_m - lambda_act)/ pow(lambda_m - lambda_0, 2)) *
                        m_constituents[alpha].rhoR_alpha[sn] / m_constituents[alpha].rho_hat_alpha_h;
 
-            sigma_act_mat = 1.0 / m_J_curr * (F_s * mat3dd(0,S_act,0) * F_s.transpose()).sym();
+            sigma_act_mat = 1.0 / m_J_curr * (F_s * S_act * F_s.transpose()).sym();
             //TODO : Check this
 
             CC_act_mat = tens4ds(0.0);
