@@ -448,14 +448,9 @@ void GRMaterialPoint::update_sigma(int sn) {
     double lambda_act = 0;
     double lambda_act_1 = 0;
     double lambda_act_2 = 0;
-    double parab_act = 0;
-    double hat_sigma_act = 0, sigma_act = 0, dSdC_act = 0, C = 0;
-    mat3ds sigma_act_mat(0);
-    double Cbar_act = 0;
 
     //Stiffness tensor
     tens4ds CC(0.0);
-    tens4ds CC_act_mat(0.0);
     tens4ds hat_CC_1(0.0);
     tens4ds hat_CC_2(0.0);
 
@@ -598,32 +593,33 @@ void GRMaterialPoint::update_sigma(int sn) {
 
 
         if (m_constituents[alpha].m_active == 1) {
-        
 
             lambda_m_act = m_F_s[sn](1, 1)/lambda_act;
 
-            vec3d Nc = vec3d(0.,1.,0.)/(F_s*vec3d(0.,1.,0.)).norm();
+            // Copy the local element basis directions to n
+            vec3d n[2];
+            n[0].x = 0; n[0].y = 1; n[0].z = 0;
+            n[1].x = 0; n[1].y = 0; n[1].z = 1;
+            // Evaluate the structural direction in the current configuration
+            vec3d ar,a;
+            double eta_alpha_curr = m_constituents[alpha].eta_alpha_h;
+            double cg = cos(eta_alpha_curr); double sg = sin(eta_alpha_curr);
+            ar = n[0]*sg + n[1]*cg;
+            ar = ar/ar.norm();
+            a = m_F_s[sn]*ar;
+
+            mat3ds h0 = dyad(a);
 
             //Find active stress contribtion
             //add in initial active stress radius contribution
-            C = CB - CS * (bar_tauw_curr / bar_tauw_h - 1);
-            parab_act = (1.0-pow((lambda_m-lambda_m_act)/(lambda_m-lambda_0),2));
+            double phismc = m_constituents[alpha].rhoR_alpha[sn] / m_constituents[alpha].rho_hat_alpha_h / m_J_curr;
+            double C = CB - CS * (bar_tauw_curr / bar_tauw_h - 1);
 
-            mat3d S_act = T_act * (1 - exp(-pow(C, 2))) * lambda_m_act * parab_act * dyad(Nc) * m_constituents[alpha].rhoR_alpha[sn] / m_constituents[alpha].rho_hat_alpha_h;
-
-            dSdC_act = T_act *  (1 - exp(-pow(C, 2))) * (1/lambda_act) *
-                       ((-1/pow(lambda_act,2))*parab_act + 2*(1/lambda_act)*(lambda_m - lambda_act)/ pow(lambda_m - lambda_0, 2)) *
-                       m_constituents[alpha].rhoR_alpha[sn] / m_constituents[alpha].rho_hat_alpha_h;
-
-            sigma_act_mat = 1.0 / m_J_curr * (F_s * S_act * F_s.transpose()).sym();
-            //TODO : Check this
-
-            CC_act_mat = tens4ds(0.0);
-            CC_act_mat(1,1,1,1) = dSdC_act;
-            CC_act_mat = 1.0 / m_J_curr * CC_act_mat.pp(F_s);
-
+            mat3ds  sigma_act_mat = h0 * phismc * T_act * (1 - exp(-pow(C, 2))) * lambda_m_act * (1.0-pow((lambda_m-lambda_m_act)/(lambda_m-lambda_0),2));
+            //tens4ds CC_act_mat = dyad1s(h0) * phismc * T_act * (1 - exp(-pow(C, 2))) * lambda_m_act * (1.0-pow((lambda_m-lambda_m_act)/(lambda_m-lambda_0),2));
+            
             sigma += sigma_act_mat;
-            CC += CC_act_mat;
+            //CC += CC_act_mat;
 
         }
 
