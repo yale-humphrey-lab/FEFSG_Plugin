@@ -171,56 +171,32 @@ def getGeometry():
                 elif vesselType == "torus":
 
                     if (theta == 0):
-                        """
                         if (phi == 0.0):
                             fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        if (phi == -np.pi/2.0):
-                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
                         if (phi == -np.pi):
                             fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        if (phi == -3.0*np.pi/2.0):
-                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        """
                         fix_z.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
 
                     if  (theta == np.pi/2.0):
-                        """
                         if (phi == 0.0):
                             fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        if (phi == -np.pi/2.0):
-                            fix_z.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
                         if (phi == -np.pi):
                             fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        if (phi == -3.0*np.pi/2.0):
-                            fix_z.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        """
                         fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
 
 
                     if  (theta == np.pi):
-                        """
                         if (phi == 0.0):
                             fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        if (phi == -np.pi/2.0):
-                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
                         if (phi == -np.pi):
                             fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        if (phi == -3.0*np.pi/2.0):
-                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        """
                         fix_z.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
 
                     if  (theta == 3.0*np.pi/2.0):
-                        """
                         if (phi == 0.0):
                             fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        if (phi == -np.pi/2.0):
-                            fix_z.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
                         if (phi == -np.pi):
                             fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        if (phi == -3.0*np.pi/2.0):
-                            fix_z.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        """
                         fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
                 
 
