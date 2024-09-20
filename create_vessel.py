@@ -4,25 +4,26 @@ import vtk
 import xml.etree.ElementTree as ET
 import argparse
 
-
-
-
-
-
-def update_geometry(xml_file_path, xml_items):
+def update_geometry(xml_file_path, xml_items1, xml_items2):
     tree = ET.parse(xml_file_path)
     root = tree.getroot()
 
     # Find the Geometry tag
     geometry_tag = root.find(".//Mesh")
-
     # Remove existing content under Geometry tag
     geometry_tag.clear()
-
-    for item in xml_items:
+    for item in xml_items1:
         geometry_tag.append(item)
 
+    # Find the Boundary tag
+    boundary_tag = root.find(".//Boundary")
+    # Remove existing content under Geometry tag
+    boundary_tag.clear()
+    for item in xml_items2:
+        boundary_tag.append(item)
+
     ET.indent(tree, '  ')
+
     tree.write(xml_file_path, encoding='utf-8', xml_declaration=True) 
 
 def create_quadratic_hexahedron_mesh(nodes, connectivity):
@@ -81,12 +82,12 @@ def getGeometry():
     vesselType = "torus"
     torusFraction = 0.25
     torusRadius = 10.0
-    numCirc = 20 #Must be divisible by 4!
-    numLen = 40
+    numCirc = 8 #Must be divisible by 4!
+    numLen = 12
     numRad = 1
     radius = 6.468e-01
     thickness = 4.02e-02
-    length = 15
+    length = 5
 
     half_circumfrence = False
     quarter_circumfrence = False
@@ -106,13 +107,15 @@ def getGeometry():
     fix_x = []
     fix_y = []
     fix_z = []
+    fix_x_quad = []
+    fix_y_quad = []
+    fix_z_quad = []
     inner_surf = []
     axis_a = []
     axis_d = []
     aneurysm_val = []
 
     num = 1
-
 
     maxCirc = numCirc
     if half_circumfrence:
@@ -121,6 +124,10 @@ def getGeometry():
         maxCirc = numCirc//4 + 1
 
     maxLen = numLen + 1
+
+    if torusFraction == 1.0:
+        maxLen = numLen
+
     if half_length:
         maxLen = numLen//2 + 1
 
@@ -161,23 +168,60 @@ def getGeometry():
                         if (j == 1*numCirc/4 or j == 3*numCirc/4) and (k == 0) and (i == 0 or i == numLen):
                             fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
 
-                if vesselType == "torus":
-                    if half_circumfrence:
-                        if  (j == 0 or j == 2*numCirc/4):
-                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        if (j == 1*numCirc/4 or j == 3*numCirc/4) and (k == 0) and (i == 0 or i == numLen):
-                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                    elif quarter_circumfrence:
-                        if  (j == 0 or j == 2*numCirc/4):
-                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        if (j == 1*numCirc/4 or j == 3*numCirc/4):
-                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                    else:
-                        if  (j == 0 or j == 2*numCirc/4) and (k == 0) and (i == 0 or i == numLen):
-                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-                        if (j == 1*numCirc/4 or j == 3*numCirc/4) and (k == 0) and (i == 0 or i == numLen):
-                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                elif vesselType == "torus":
 
+                    if (theta == 0):
+                        """
+                        if (phi == 0.0):
+                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (phi == -np.pi/2.0):
+                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (phi == -np.pi):
+                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (phi == -3.0*np.pi/2.0):
+                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        """
+                        fix_z.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+
+                    if  (theta == np.pi/2.0):
+                        """
+                        if (phi == 0.0):
+                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (phi == -np.pi/2.0):
+                            fix_z.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (phi == -np.pi):
+                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (phi == -3.0*np.pi/2.0):
+                            fix_z.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        """
+                        fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+
+
+                    if  (theta == np.pi):
+                        """
+                        if (phi == 0.0):
+                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (phi == -np.pi/2.0):
+                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (phi == -np.pi):
+                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (phi == -3.0*np.pi/2.0):
+                            fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        """
+                        fix_z.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+
+                    if  (theta == 3.0*np.pi/2.0):
+                        """
+                        if (phi == 0.0):
+                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (phi == -np.pi/2.0):
+                            fix_z.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (phi == -np.pi):
+                            fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        if (phi == -3.0*np.pi/2.0):
+                            fix_z.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+                        """
+                        fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
                 
 
     hex_8_coords=[
@@ -299,28 +343,38 @@ def getGeometry():
 
                 cellPts = []
 
-                for coord in elem_coords:
-                    cellPts.append(point_ids[(i+coord[1])*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k+coord[2])])
+                if torusFraction == 1.0:
+                    for coord in elem_coords:
+                        cellPts.append(point_ids[((i+coord[1])%(numLen))*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k+coord[2])])
+                else:
+                    for coord in elem_coords:
+                        cellPts.append(point_ids[(i+coord[1])*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k+coord[2])])
 
                 cells.append(cellPts)
 
-                if i == 0:
-                    quadPts = []
-                    for coord in quad_coords:
-                        quadPts.append(point_ids[(i)*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k+coord[1])])
-                    fix_z.append(quadPts)
-
-                if i == maxLen-numJump:
-                    quadPts = []
-                    for coord in quad_coords:
-                        quadPts.append(point_ids[(i + numJump)*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k+coord[1])])
-                    fix_z.append(quadPts)
 
                 if k == 0:
                     quadPts = []
                     for coord in quad_coords:
-                        quadPts.append(point_ids[(i+coord[1])*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k)])
+                        if torusFraction == 1.0:
+                            quadPts.append(point_ids[((i+coord[1])%(numLen))*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k)])
+                        else:
+                            quadPts.append(point_ids[(i+coord[1])*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k)])
                     inner_surf.append(quadPts)
+
+
+                if vesselType == "cylinder":
+                    if i == 0:
+                        quadPts = []
+                        for coord in quad_coords:
+                            quadPts.append(point_ids[(i)*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k+coord[1])])
+                        fix_z_quad.append(quadPts)
+
+                    if i == maxLen-numJump:
+                        quadPts = []
+                        for coord in quad_coords:
+                            quadPts.append(point_ids[(i + numJump)*(numCirc+1)*(numRad+1) + ((j+coord[0])%(numCirc))*(numRad+1) + (k+coord[1])])
+                        fix_z_quad.append(quadPts)
 
 
                 theta = 2.0*(j+numJump/2.)*np.pi/numCirc
@@ -330,7 +384,8 @@ def getGeometry():
                 aneurysm_val.append(getAneurysmValue(zPt,theta))
 
 
-    xml_content = []
+    xml_content1 = []
+    xml_content2 = []
 
     # Write Nodes
     xml_object = ''
@@ -339,7 +394,7 @@ def getGeometry():
         str_val = ', '.join(map(str, node))
         xml_object += f'\t\t<node id="{i}">{str_val}</node>\n'
     xml_object += '\t</Nodes>\n'
-    xml_content.append(ET.fromstring(xml_object))
+    xml_content1.append(ET.fromstring(xml_object))
 
     # Write Elements
     xml_object = ''
@@ -353,37 +408,77 @@ def getGeometry():
         str_val = ', '.join(map(str, element))
         xml_object += f'\t\t<elem id="{i}">{str_val}</elem>\n'
     xml_object += '\t</Elements>\n'
-    xml_content.append(ET.fromstring(xml_object))
+    xml_content1.append(ET.fromstring(xml_object))
 
-    # Write Surfaces
-    xml_object = ''
-    xml_object += '\t<NodeSet name="FixXs">\n'
-    result_string = ', '.join(str(x) for x in fix_x)
-    xml_object += f'\t\t{result_string}\n'
-    xml_object += '\t</NodeSet>\n'
-    xml_content.append(ET.fromstring(xml_object))
+    if fix_x:
+        # Write Surfaces
+        xml_object = ''
+        xml_object += '\t<NodeSet name="FixXs">\n'
+        result_string = ', '.join(str(x) for x in fix_x)
+        xml_object += f'\t\t{result_string}\n'
+        xml_object += '\t</NodeSet>\n'
+        xml_content1.append(ET.fromstring(xml_object))
+
+    if fix_y:
+        xml_object = ''
+        xml_object += '\t<NodeSet name="FixYs">\n'
+        result_string = ', '.join(str(x) for x in fix_y)
+        xml_object += f'\t\t{result_string}\n'
+        xml_object += '\t</NodeSet>\n'
+        xml_content1.append(ET.fromstring(xml_object))
+
+    if fix_z:
+        xml_object = ''
+        xml_object += '\t<NodeSet name="FixZs">\n'
+        result_string = ', '.join(str(x) for x in fix_z)
+        xml_object += f'\t\t{result_string}\n'
+        xml_object += '\t</NodeSet>\n'
+        xml_content1.append(ET.fromstring(xml_object))
 
 
-    xml_object = ''
-    xml_object += '\t<NodeSet name="FixYs">\n'
-    result_string = ', '.join(str(x) for x in fix_y)
-    xml_object += f'\t\t{result_string}\n'
-    xml_object += '\t</NodeSet>\n'
-    xml_content.append(ET.fromstring(xml_object))
+    if fix_x_quad:
+        xml_object = ''
+        xml_object += '\t<Surface name="FixXs">\n'
+        for i, surface in enumerate(fix_x_quad, start=1):
+            str_val = ', '.join(map(str, surface))
+            if hex_8:
+                xml_object += f'\t\t<quad4 id="{i}">{str_val}</quad4>\n'
+            elif hex_20:
+                xml_object += f'\t\t<quad8 id="{i}">{str_val}</quad8>\n'
+            else:
+                xml_object += f'\t\t<quad9 id="{i}">{str_val}</quad9>\n'
+        xml_object += '\t</Surface>\n'
+        xml_content1.append(ET.fromstring(xml_object))
 
 
-    xml_object = ''
-    xml_object += '\t<Surface name="FixZs">\n'
-    for i, surface in enumerate(fix_z, start=1):
-        str_val = ', '.join(map(str, surface))
-        if hex_8:
-            xml_object += f'\t\t<quad4 id="{i}">{str_val}</quad4>\n'
-        elif hex_20:
-            xml_object += f'\t\t<quad8 id="{i}">{str_val}</quad8>\n'
-        else:
-            xml_object += f'\t\t<quad9 id="{i}">{str_val}</quad9>\n'
-    xml_object += '\t</Surface>\n'
-    xml_content.append(ET.fromstring(xml_object))
+    if fix_y_quad:
+        xml_object = ''
+        xml_object += '\t<Surface name="FixYs">\n'
+        for i, surface in enumerate(fix_y_quad, start=1):
+            str_val = ', '.join(map(str, surface))
+            if hex_8:
+                xml_object += f'\t\t<quad4 id="{i}">{str_val}</quad4>\n'
+            elif hex_20:
+                xml_object += f'\t\t<quad8 id="{i}">{str_val}</quad8>\n'
+            else:
+                xml_object += f'\t\t<quad9 id="{i}">{str_val}</quad9>\n'
+        xml_object += '\t</Surface>\n'
+        xml_content1.append(ET.fromstring(xml_object))
+
+
+    if fix_z_quad:
+        xml_object = ''
+        xml_object += '\t<Surface name="FixZs">\n'
+        for i, surface in enumerate(fix_z_quad, start=1):
+            str_val = ', '.join(map(str, surface))
+            if hex_8:
+                xml_object += f'\t\t<quad4 id="{i}">{str_val}</quad4>\n'
+            elif hex_20:
+                xml_object += f'\t\t<quad8 id="{i}">{str_val}</quad8>\n'
+            else:
+                xml_object += f'\t\t<quad9 id="{i}">{str_val}</quad9>\n'
+        xml_object += '\t</Surface>\n'
+        xml_content1.append(ET.fromstring(xml_object))
 
 
     xml_object = ''
@@ -397,9 +492,65 @@ def getGeometry():
         else:
             xml_object += f'\t\t<quad9 id="{i}">{str_val}</quad9>\n'
     xml_object += '\t</Surface>\n'
-    xml_content.append(ET.fromstring(xml_object))
+    xml_content1.append(ET.fromstring(xml_object))
 
-    return xml_content
+
+
+
+
+
+    if fix_x:
+        xml_object = ''
+        xml_object += '\t<bc name="FixXs" type="zero displacement" node_set="FixXs">\n'
+        xml_object += f'\t\t<x_dof>1</x_dof>\n'
+        xml_object += f'\t\t<y_dof>0</y_dof>\n'
+        xml_object += f'\t\t<z_dof>0</z_dof>\n'
+        xml_object += '\t</bc>\n'
+        xml_content2.append(ET.fromstring(xml_object))
+    if fix_y:
+        xml_object = ''
+        xml_object += '\t<bc name="FixYs" type="zero displacement" node_set="FixYs">\n'
+        xml_object += f'\t\t<x_dof>0</x_dof>\n'
+        xml_object += f'\t\t<y_dof>1</y_dof>\n'
+        xml_object += f'\t\t<z_dof>0</z_dof>\n'
+        xml_object += '\t</bc>\n'
+        xml_content2.append(ET.fromstring(xml_object))
+    if fix_z:
+        xml_object = ''
+        xml_object += '\t<bc name="FixZs" type="zero displacement" node_set="FixZs">\n'
+        xml_object += f'\t\t<x_dof>0</x_dof>\n'
+        xml_object += f'\t\t<y_dof>0</y_dof>\n'
+        xml_object += f'\t\t<z_dof>1</z_dof>\n'
+        xml_object += '\t</bc>\n'
+        xml_content2.append(ET.fromstring(xml_object))
+
+
+    if fix_x_quad:
+        xml_object = ''
+        xml_object += '\t<bc name="FixXs" type="zero displacement" node_set="@surface:FixXs">\n'
+        xml_object += f'\t\t<x_dof>1</x_dof>\n'
+        xml_object += f'\t\t<y_dof>0</y_dof>\n'
+        xml_object += f'\t\t<z_dof>0</z_dof>\n'
+        xml_object += '\t</bc>\n'
+        xml_content2.append(ET.fromstring(xml_object))
+    if fix_y_quad:
+        xml_object = ''
+        xml_object += '\t<bc name="FixYs" type="zero displacement" node_set="@surface:FixYs">\n'
+        xml_object += f'\t\t<x_dof>0</x_dof>\n'
+        xml_object += f'\t\t<y_dof>1</y_dof>\n'
+        xml_object += f'\t\t<z_dof>0</z_dof>\n'
+        xml_object += '\t</bc>\n'
+        xml_content2.append(ET.fromstring(xml_object))
+    if fix_z_quad:
+        xml_object = ''
+        xml_object += '\t<bc name="FixZs" type="zero displacement" node_set="@surface:FixZs">\n'
+        xml_object += f'\t\t<x_dof>0</x_dof>\n'
+        xml_object += f'\t\t<y_dof>0</y_dof>\n'
+        xml_object += f'\t\t<z_dof>1</z_dof>\n'
+        xml_object += '\t</bc>\n'
+        xml_content2.append(ET.fromstring(xml_object))
+
+    return xml_content1, xml_content2
 
 if __name__ == "__main__":
 
@@ -407,4 +558,6 @@ if __name__ == "__main__":
     parser.add_argument('xml_file', help='Path to the XML file')
     args = parser.parse_args()
 
-    update_geometry(args.xml_file, getGeometry())
+    xml_content1, xml_content2 = getGeometry()
+
+    update_geometry(args.xml_file, xml_content1, xml_content2)
