@@ -3,6 +3,11 @@ import pyvista as pv
 import vtk
 import xml.etree.ElementTree as ET
 import argparse
+from scipy.special import erfinv
+from scipy.spatial.distance import pdist, squareform
+from numpy.linalg import pinv
+from scipy.stats import multivariate_normal, norm
+import matplotlib.pyplot as plt
 
 def update_geometry(xml_file_path, xml_items1, xml_items2):
     tree = ET.parse(xml_file_path)
@@ -51,50 +56,151 @@ def save_vtk_mesh(grid, filename):
     writer.SetInputData(grid)
     writer.Write()
 
-def getAneurysmValue(z, theta):
-    """                                                                                                                                                                                                      
-    Get the value of vessel behavior based on point location and radius                                                                                                                                      
-    """
 
-    zod = 0.3
-    zapex = 0.0
+# Ensure semi-positive definiteness (SPD)
+def nearestSPD(A):
+    """Find the nearest symmetric positive definite matrix."""
+    B = (A + A.T) / 2
+    _, s, V = np.linalg.svd(B)
+    H = np.dot(V.T, np.dot(np.diag(s), V))
+    A2 = (B + H) / 2
+    A3 = (A2 + A2.T) / 2
+    if isSPD(A3):
+        return A3
+    spacing = np.spacing(np.linalg.norm(A))
+    I = np.eye(A.shape[0])
+    k = 1
+    while not isSPD(A3):
+        mineig = np.min(np.real(np.linalg.eigvals(A3)))
+        A3 += I * (-mineig * k**2 + spacing)
+        k += 1
+    return A3
 
-    thetaod = np.pi
-    thetaapex = np.pi
 
-    vend = 0.1
-    vapex = 1.0
-    vz = 2.0
-    vtheta = 2.0
+def isSPD(A):
+    """Check if a matrix is symmetric positive definite."""
+    try:
+        np.linalg.cholesky(A)
+        return True
+    except np.linalg.LinAlgError:
+        return False
 
-    vesselValue = (
-        vend + (vapex - vend) * np.exp(-np.abs((z - zapex) / zod) ** vz)
-        * np.exp(-np.abs((theta - thetaapex) / thetaod) ** vtheta)
-    )
 
-    #zPt = point[2]
-    #vesselValue = 0.65*np.exp(-abs(zPt/(radius*4.0))**2)
+def getRandomInjuryField(T, Z, X, Y, r):
+
+    overall_perturbed = 0.6
+    slope = 0.5
+    L_t = np.pi
+    L_z = 5.0
+    rng = np.random.seed()
+
+    mu = 1/2 - 1/slope/np.sqrt(np.pi) * np.exp(-erfinv(1 - 2 * overall_perturbed)**2) * erfinv(1 - 2 * overall_perturbed)
+    sigma = 1/slope/np.sqrt(2 * np.pi) * np.exp(-erfinv(1 - 2 * overall_perturbed)**2)
+
+    # Pairwise distances in theta [mm], taking into account the vessel circumference
+    D_t = squareform(pdist(T.flatten()[:, np.newaxis])) / 360 * 2 * np.pi * r
+    # To enforce periodicity in the covariance function (using the periodic kernel)
+    D_t = 2 * np.sin(np.pi * D_t / (2 * np.pi * r))
+    # Pairwise distances in z [mm]
+    D_z = squareform(pdist(Z.flatten()[:, np.newaxis]))
+
+    # Overall standardized squared distance metric
+    D_squared = (D_t * r / L_t) ** 2 + (D_z / L_z) ** 2
+
+    # Covariance matrix of mechanosensing (M*) values at all surface points
+    SIGMA = sigma**2 * np.exp(-0.5 * D_squared)
+
+    # Correlation matrix
+    diag_SIGMA = np.sqrt(np.diag(SIGMA))
+    CORR = SIGMA / np.outer(diag_SIGMA, diag_SIGMA)
+
+    # Number of standard deviations away to place M* at the boundaries
+    n_std = 2
+
+    # Non-boundary indices
+    idx1 = np.where(~((Z.flatten() == np.min(Z)) | (Z.flatten() == np.max(Z))))[0]
+
+    # Boundary indices
+    idx2 = np.where((Z.flatten() == np.min(Z)) | (Z.flatten() == np.max(Z)))[0]
+
+    # Matrix of "regression coefficients"
+    regmat = SIGMA[np.ix_(idx1, idx2)] @ pinv(SIGMA[np.ix_(idx2, idx2)])
+
+    # Conditional mean
+    MU_cond = np.full(T.size, np.nan)  # Initialize with NaN values
+    MU_cond[idx2] = mu - n_std * sigma
+    MU_cond[idx1] = mu + regmat @ (mu - n_std * sigma - mu * np.ones(len(idx2)))
+    MU_cond = MU_cond.T  # Ensure it's a row vector
+
+    # Conditional covariance matrix
+    SIGMA_cond = np.zeros_like(SIGMA)
+    SIGMA_cond[np.ix_(idx1, idx1)] = SIGMA[np.ix_(idx1, idx1)] - regmat @ SIGMA[np.ix_(idx2, idx1)]
+
+    # Apply nearestSPD to ensure positive semi-definiteness
+    SIGMA_cond_SPD = nearestSPD(SIGMA_cond)
+
+    # Generate random field (latent Gaussian process)
+    M_star = multivariate_normal.rvs(mean=MU_cond, cov=SIGMA_cond_SPD).reshape(T.shape)
+
+    if False: #if match_user_params:
+        # Transform to match Normal(mu, sigma) exactly using inverse CDF (norminv equivalent)
+        # In Python, we use np.histogram for ksdensity approximation and norm.ppf for inverse CDF
+        sorted_M_star = np.sort(M_star.flatten())
+        
+        # Approximate CDF using empirical distribution (like ksdensity)
+        cdf_vals = np.linspace(0, 1, len(sorted_M_star), endpoint=False)
+
+        # Apply the inverse CDF (percent-point function)
+        M_star_transformed = norm.ppf(cdf_vals, loc=mu, scale=sigma)
+        
+        # Reshape to the original size
+        M_star = np.interp(M_star.flatten(), sorted_M_star, M_star_transformed).reshape(M_star.shape)
+
+    # Mechanosensing field in [0, 1]
+    M = np.clip(M_star, 0, 1)
+
+
+    # Create a heatmap of the mechanosensing field M
+    plt.figure(figsize=(8, 6))
+    plt.imshow(M, extent=[np.min(X), np.max(X), np.min(Z), np.max(Z)], origin='lower', cmap='viridis', aspect='auto')
+
+    # Add colorbar
+    plt.colorbar(label='Mechanosensing Field (M)')
+
+    # Labels and title
+    plt.xlabel('X [mm]')
+    plt.ylabel('Z [mm]')
+    plt.title('Mechanosensing Field Heatmap')
+
+    # Show the plot
+    plt.show()
+
+    import pdb; pdb.set_trace()
+
     return vesselValue
 
 def getGeometry():
     print("Initializing cylindrical vessel...")
 
-    vesselType = "torus"
+    vesselType = "cylinder" # Can be "torus" or "cylinder"
     torusFraction = 0.25
     torusRadius = 10.0
-    numCirc = 8 #Must be divisible by 4!
-    numLen = 12
-    numRad = 1
+    numCirc = 8 # Number of circumfrential elements # Must be divisible by 4
+    numLen = 12 # Number of axial elements
+    numRad = 1 # Number of radial elements
     radius = 6.468e-01
     thickness = 4.02e-02
-    length = 5
+    length = 10.0
 
+    # Symmetry conditions
     half_circumfrence = False
     quarter_circumfrence = False
-    hex_8 = False
-    hex_20 = False
     half_length = False
 
+    # Element types (default quadratic hexehdron)
+    hex_8 = False
+    hex_20 = False
+    
 
     if hex_8 == False:
         numCirc = numCirc*2 #Must be divisible by 4!
@@ -111,8 +217,6 @@ def getGeometry():
     fix_y_quad = []
     fix_z_quad = []
     inner_surf = []
-    axis_a = []
-    axis_d = []
     aneurysm_val = []
 
     num = 1
@@ -131,6 +235,11 @@ def getGeometry():
     if half_length:
         maxLen = numLen//2 + 1
 
+    T = np.zeros((maxCirc, maxLen))
+    Z = np.zeros((maxCirc, maxLen))
+    X = np.zeros((maxCirc, maxLen))
+    Y = np.zeros((maxCirc, maxLen))
+
     for i in range(maxLen):
         theta = torusFraction * 2 * np.pi * i / numLen  # Azimuthal angle (circumference)
         for j in range(maxCirc):
@@ -146,6 +255,10 @@ def getGeometry():
                     xPt = radius * np.sin(phi) + (np.sin(phi)*(thickness*k/numRad))
                     yPt = (torusRadius + radius * np.cos(phi)) * np.cos(theta) + ((np.cos(phi) * np.cos(theta))*(thickness*k/numRad))
                     zPt = (torusRadius + radius * np.cos(phi)) * np.sin(theta) + ((np.cos(phi) * np.sin(theta))*(thickness*k/numRad))
+
+                if k == 0:
+                    T[j,i] = phi
+                    Z[j,i] = zPt
 
                 points.append([xPt, yPt, zPt])
                 point_ids[i*(numCirc+1)*(numRad+1) + j*(numRad+1) + k] = num
@@ -198,6 +311,8 @@ def getGeometry():
                         if (phi == -np.pi):
                             fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
                         fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
+
+    getRandomInjuryField(T, Z, radius)
                 
 
     hex_8_coords=[
