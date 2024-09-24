@@ -4,12 +4,12 @@ import vtk
 import xml.etree.ElementTree as ET
 import argparse
 from scipy.special import erfinv
-from scipy.spatial.distance import pdist, squareform
+from scipy.spatial.distance import cdist, squareform
 from numpy.linalg import pinv
 from scipy.stats import multivariate_normal, norm
 import matplotlib.pyplot as plt
 
-def update_geometry(xml_file_path, xml_items1, xml_items2):
+def update_geometry(xml_file_path, xml_items1, xml_items2, xml_items3):
     tree = ET.parse(xml_file_path)
     root = tree.getroot()
 
@@ -26,6 +26,14 @@ def update_geometry(xml_file_path, xml_items1, xml_items2):
     boundary_tag.clear()
     for item in xml_items2:
         boundary_tag.append(item)
+
+    # Find the Boundary tag
+    boundary_tag = root.find(".//MeshData")
+    # Remove existing content under Geometry tag
+    boundary_tag.clear()
+    for item in xml_items3:
+        boundary_tag.append(item)
+
 
     ET.indent(tree, '  ')
 
@@ -86,23 +94,23 @@ def isSPD(A):
         return False
 
 
-def getRandomInjuryField(T, Z, X, Y, r):
+def getRandomInjuryField(T, Z, r):
 
-    overall_perturbed = 0.6
-    slope = 0.5
-    L_t = np.pi
-    L_z = 5.0
-    rng = np.random.seed()
+    overall_perturbed = 0.15
+    slope = 0.6
+    L_t = 2.0
+    L_z = 1.5
+    #np.random.seed(5)
 
     mu = 1/2 - 1/slope/np.sqrt(np.pi) * np.exp(-erfinv(1 - 2 * overall_perturbed)**2) * erfinv(1 - 2 * overall_perturbed)
     sigma = 1/slope/np.sqrt(2 * np.pi) * np.exp(-erfinv(1 - 2 * overall_perturbed)**2)
 
     # Pairwise distances in theta [mm], taking into account the vessel circumference
-    D_t = squareform(pdist(T.flatten()[:, np.newaxis])) / 360 * 2 * np.pi * r
+    D_t = cdist(T.flatten()[:, np.newaxis] + np.pi,T.flatten()[:, np.newaxis] + np.pi)*r
     # To enforce periodicity in the covariance function (using the periodic kernel)
     D_t = 2 * np.sin(np.pi * D_t / (2 * np.pi * r))
     # Pairwise distances in z [mm]
-    D_z = squareform(pdist(Z.flatten()[:, np.newaxis]))
+    D_z = cdist(Z.flatten()[:, np.newaxis],Z.flatten()[:, np.newaxis])
 
     # Overall standardized squared distance metric
     D_squared = (D_t * r / L_t) ** 2 + (D_z / L_z) ** 2
@@ -142,42 +150,23 @@ def getRandomInjuryField(T, Z, X, Y, r):
     # Generate random field (latent Gaussian process)
     M_star = multivariate_normal.rvs(mean=MU_cond, cov=SIGMA_cond_SPD).reshape(T.shape)
 
-    if False: #if match_user_params:
-        # Transform to match Normal(mu, sigma) exactly using inverse CDF (norminv equivalent)
-        # In Python, we use np.histogram for ksdensity approximation and norm.ppf for inverse CDF
-        sorted_M_star = np.sort(M_star.flatten())
-        
-        # Approximate CDF using empirical distribution (like ksdensity)
-        cdf_vals = np.linspace(0, 1, len(sorted_M_star), endpoint=False)
+    # Transform to match Normal(mu, sigma) exactly using inverse CDF (norminv equivalent)
+    # In Python, we use np.histogram for ksdensity approximation and norm.ppf for inverse CDF
+    sorted_M_star = np.sort(M_star.flatten())
+    
+    # Approximate CDF using empirical distribution (like ksdensity)
+    cdf_vals = np.linspace(0, 1, len(sorted_M_star), endpoint=False)
 
-        # Apply the inverse CDF (percent-point function)
-        M_star_transformed = norm.ppf(cdf_vals, loc=mu, scale=sigma)
-        
-        # Reshape to the original size
-        M_star = np.interp(M_star.flatten(), sorted_M_star, M_star_transformed).reshape(M_star.shape)
+    # Apply the inverse CDF (percent-point function)
+    M_star_transformed = norm.ppf(cdf_vals, loc=mu, scale=sigma)
+    
+    # Reshape to the original size
+    M_star = np.interp(M_star.flatten(), sorted_M_star, M_star_transformed).reshape(M_star.shape)
 
     # Mechanosensing field in [0, 1]
     M = np.clip(M_star, 0, 1)
 
-
-    # Create a heatmap of the mechanosensing field M
-    plt.figure(figsize=(8, 6))
-    plt.imshow(M, extent=[np.min(X), np.max(X), np.min(Z), np.max(Z)], origin='lower', cmap='viridis', aspect='auto')
-
-    # Add colorbar
-    plt.colorbar(label='Mechanosensing Field (M)')
-
-    # Labels and title
-    plt.xlabel('X [mm]')
-    plt.ylabel('Z [mm]')
-    plt.title('Mechanosensing Field Heatmap')
-
-    # Show the plot
-    plt.show()
-
-    import pdb; pdb.set_trace()
-
-    return vesselValue
+    return M
 
 def getGeometry():
     print("Initializing cylindrical vessel...")
@@ -185,12 +174,12 @@ def getGeometry():
     vesselType = "cylinder" # Can be "torus" or "cylinder"
     torusFraction = 0.25
     torusRadius = 10.0
-    numCirc = 8 # Number of circumfrential elements # Must be divisible by 4
-    numLen = 12 # Number of axial elements
+    numCirc = 12 # Number of circumfrential elements # Must be divisible by 4
+    numLen = 24 # Number of axial elements
     numRad = 1 # Number of radial elements
     radius = 6.468e-01
     thickness = 4.02e-02
-    length = 10.0
+    length = 15.0
 
     # Symmetry conditions
     half_circumfrence = False
@@ -217,7 +206,7 @@ def getGeometry():
     fix_y_quad = []
     fix_z_quad = []
     inner_surf = []
-    aneurysm_val = []
+    injury_val = []
 
     num = 1
 
@@ -235,11 +224,6 @@ def getGeometry():
     if half_length:
         maxLen = numLen//2 + 1
 
-    T = np.zeros((maxCirc, maxLen))
-    Z = np.zeros((maxCirc, maxLen))
-    X = np.zeros((maxCirc, maxLen))
-    Y = np.zeros((maxCirc, maxLen))
-
     for i in range(maxLen):
         theta = torusFraction * 2 * np.pi * i / numLen  # Azimuthal angle (circumference)
         for j in range(maxCirc):
@@ -255,10 +239,6 @@ def getGeometry():
                     xPt = radius * np.sin(phi) + (np.sin(phi)*(thickness*k/numRad))
                     yPt = (torusRadius + radius * np.cos(phi)) * np.cos(theta) + ((np.cos(phi) * np.cos(theta))*(thickness*k/numRad))
                     zPt = (torusRadius + radius * np.cos(phi)) * np.sin(theta) + ((np.cos(phi) * np.sin(theta))*(thickness*k/numRad))
-
-                if k == 0:
-                    T[j,i] = phi
-                    Z[j,i] = zPt
 
                 points.append([xPt, yPt, zPt])
                 point_ids[i*(numCirc+1)*(numRad+1) + j*(numRad+1) + k] = num
@@ -311,8 +291,6 @@ def getGeometry():
                         if (phi == -np.pi):
                             fix_x.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
                         fix_y.append(point_ids[(i)*(numCirc+1)*(numRad+1) + (j)*(numRad+1) + (k)])
-
-    getRandomInjuryField(T, Z, radius)
                 
 
     hex_8_coords=[
@@ -428,6 +406,10 @@ def getGeometry():
     if half_length:
         maxLen = numLen//2
 
+
+    T, Z = np.meshgrid(np.linspace(0, 2.0*np.pi, maxCirc), np.linspace(-length/2.0, length/2.0, maxLen))
+    M = getRandomInjuryField(T, Z, radius)
+
     for i in range(0, maxLen, numJump):
         for j in range(0, maxCirc, numJump):
             for k in range(0, numRad, numJump):
@@ -472,11 +454,13 @@ def getGeometry():
                 xPt = np.cos(theta)
                 yPt = np.sin(theta)
                 zPt = length*(i+numJump/2.)/numLen - length/2.0
-                aneurysm_val.append(getAneurysmValue(zPt,theta))
+                injury_val.append(M[i,j])
+
 
 
     xml_content1 = []
     xml_content2 = []
+    xml_content3 = []
 
     # Write Nodes
     xml_object = ''
@@ -571,7 +555,6 @@ def getGeometry():
         xml_object += '\t</Surface>\n'
         xml_content1.append(ET.fromstring(xml_object))
 
-
     xml_object = ''
     xml_object += '\t<Surface name="PressureLoad1">\n'
     for i, surface in enumerate(inner_surf, start=1):
@@ -584,10 +567,6 @@ def getGeometry():
             xml_object += f'\t\t<quad9 id="{i}">{str_val}</quad9>\n'
     xml_object += '\t</Surface>\n'
     xml_content1.append(ET.fromstring(xml_object))
-
-
-
-
 
 
     if fix_x:
@@ -615,7 +594,6 @@ def getGeometry():
         xml_object += '\t</bc>\n'
         xml_content2.append(ET.fromstring(xml_object))
 
-
     if fix_x_quad:
         xml_object = ''
         xml_object += '\t<bc name="FixXs" type="zero displacement" node_set="@surface:FixXs">\n'
@@ -641,7 +619,31 @@ def getGeometry():
         xml_object += '\t</bc>\n'
         xml_content2.append(ET.fromstring(xml_object))
 
-    return xml_content1, xml_content2
+
+    """
+    if injury_val:
+        xml_object = ''
+        xml_object += '\t<NodeData name="injury_map" node_set="Object01">\n'
+        for i, val in enumerate(injury_val, start=1):
+            str_val = str(val)
+            xml_object += f'\t\t<node lid="{i}">{str_val}</node>\n'
+        xml_object += '\t</NodeData>\n'
+        xml_content3.append(ET.fromstring(xml_object))
+    """
+
+
+    if injury_val:
+        xml_object = ''
+        xml_object += '\t<ElementData name="injury_map" elem_set="Part1">\n'
+        for i, val in enumerate(injury_val, start=1):
+            str_val = str(val)
+            xml_object += f'\t\t<elem lid="{i}">{str_val}</elem>\n'
+        xml_object += '\t</ElementData>\n'
+        xml_content3.append(ET.fromstring(xml_object))
+
+
+
+    return xml_content1, xml_content2, xml_content3
 
 if __name__ == "__main__":
 
@@ -649,6 +651,6 @@ if __name__ == "__main__":
     parser.add_argument('xml_file', help='Path to the XML file')
     args = parser.parse_args()
 
-    xml_content1, xml_content2 = getGeometry()
+    xml_content1, xml_content2, xml_content3 = getGeometry()
 
-    update_geometry(args.xml_file, xml_content1, xml_content2)
+    update_geometry(args.xml_file, xml_content1, xml_content2, xml_content3)
