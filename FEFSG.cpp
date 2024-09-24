@@ -283,9 +283,9 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
     + 2./3.*((IoI-IxI/3.)*sbar.tr()-dyad1s(sbar.dev(),I));
 
 
-    et.m_v.x = pt.m_J_s[sn];        // Target volume 
-    et.m_v.y = m_elastin_injury_val(mp);    // Aneurysm injury
-    et.m_v.z = pt.m_W;     // Generally, elasticity density    
+    et.m_v.x = pt.m_J_s[sn];                // Target volume 
+    et.m_v.y = m_elastin_injury_val(mp);    // Aneurysm injuryy
+    et.m_a = e_z(mp);
 
     et.m_a.x = pt.m_CC(0,0,0,0) + 2.0 *  pt.m_sigma(0,0);     // Radial stiffness    
     et.m_a.y = pt.m_CC(1,1,1,1) + 2.0 *  pt.m_sigma(1,1);     // Circumfrential stiffness    
@@ -605,7 +605,7 @@ void GRMaterialPoint::update_sigma(int sn) {
             double eta_alpha_curr = m_constituents[alpha].eta_alpha_h;
             double cg = cos(eta_alpha_curr); double sg = sin(eta_alpha_curr);
             ar = n[0]*sg + n[1]*cg;
-            ar = ar/ar.norm();
+            ar = ar/(m_F_s[sn]*ar).norm();
             a = m_F_s[sn]*ar;
 
             mat3ds h0 = dyad(a);
@@ -617,7 +617,7 @@ void GRMaterialPoint::update_sigma(int sn) {
 
             mat3ds  sigma_act_mat = h0 * phismc * T_act * (1 - exp(-pow(C, 2))) * lambda_m_act * (1.0-pow((lambda_m-lambda_m_act)/(lambda_m-lambda_0),2));
             //tens4ds CC_act_mat = dyad1s(h0) * phismc * T_act * (1 - exp(-pow(C, 2))) * lambda_m_act * (1.0-pow((lambda_m-lambda_m_act)/(lambda_m-lambda_0),2));
-            
+
             sigma += sigma_act_mat;
             //CC += CC_act_mat;
 
