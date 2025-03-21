@@ -68,6 +68,7 @@ void GRMaterialPoint::Init()
     m_F_curr = mat3d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
     m_J_curr = 1.0;
     m_CC = tens4ds(0.0);
+    A_max = 0.0;
 
 
     for (int i=0; i<MAX_TIMESTEPS; ++i)
@@ -91,7 +92,7 @@ void GRMaterialPoint::Init()
     }
 
     // Read non-vector values from the first line
-    inputFile >> m_dt >> rho_hat_h >> bar_tauw_h >> sigma_inv_h >> K_delta_tauw >> K_delta_sigma >> k_act >> lambda_0 >> lambda_m >> CB >> CS >> T_act;
+    inputFile >> m_dt >> A_max >> rho_hat_h >> bar_tauw_h >> sigma_inv_h >> K_delta_tauw >> K_delta_sigma >> k_act >> lambda_0 >> lambda_m >> CB >> CS >> T_act;
 
     sigma_inv_curr = sigma_inv_h;
     bar_tauw_curr = bar_tauw_h;
@@ -256,7 +257,6 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
 
         //Loop through each constituent to update its mass density
         for  (int alpha=2; alpha<pt.m_nconstituents; ++alpha) {
-
             pt.m_constituents[alpha].c1_alpha = pt.m_constituents[alpha].c1_alpha_h*(1.0 - m_crosslinking_injury_val(mp));
             pt.m_constituents[alpha].g_alpha = pt.m_constituents[alpha].g_alpha_h*(1.0 - m_mechanoregulation_injury_val(mp));
         }
@@ -295,10 +295,6 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
 
 void GRMaterialPoint::update_kinetics(int sn) {
 
-
-    //This function updates the kinetics for G&R.
-    int taun_min = 0;
-
     //Differences in current mechanical state from the reference state
     //Stress invariant
     double delta_sigma = (sigma_inv_curr / sigma_inv_h) - 1;
@@ -321,9 +317,16 @@ void GRMaterialPoint::update_kinetics(int sn) {
     double rhoR_s = 0, rhoR_alpha_s = 0;
     double J_s = 0;
 
-    int n = 0; //number of points in integration interval
-
-    n = (sn - taun_min) + 1; //find number of integration pts
+    int taun_min = 0;
+    double s = m_dt * double(sn);
+    double tau_max = A_max; //max fiber age
+    //Determine if beyond initial time
+    if (s > tau_max) {
+        taun_min = sn - int(tau_max / m_dt);
+    }
+    else {
+        taun_min = 0;
+    }
 
     //Loop through each constituent to update its mass density
     for  (int alpha=0; alpha<m_nconstituents; ++alpha) {
@@ -473,10 +476,16 @@ void GRMaterialPoint::update_sigma(int sn) {
     double q_1 = 1.0, q_2 = 1.0;
     double k_1 = 0, k_2 = 0;
 
-    //Get current time index
     int taun_min = 0;
-    int n = 0; //number of pts in integration interval
-    n = (sn - taun_min) + 1; //number of integration pts
+    double s = m_dt * double(sn);
+    double tau_max = A_max; //max fiber age
+    //Determine if beyond initial time
+    if (s > tau_max) {
+        taun_min = sn - int(tau_max / m_dt);
+    }
+    else {
+        taun_min = 0;
+    }
 
     for  (int alpha=0; alpha<m_nconstituents; ++alpha) {
 
