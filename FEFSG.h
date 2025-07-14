@@ -157,16 +157,9 @@ public:
 
 			double eta_alpha_curr = eta_alpha_h;
 
-			//double lth = (F_tau * n[0]).norm();	// lth -> 1 for Fh -> Fo
-			//double lzh = (F_tau * n[1]).norm();	// lzh -> 1 for Fh -> Fo
-			//double aexp = 1.0;
-			//if ((eta_alpha_h != 0.0) and (eta_alpha_curr != PI/2)){
-			//	eta_alpha_curr = atan(tan(eta_alpha_h)*pow(lth/lzh,aexp));	// Remodeled angle
-			//}
-
 		    double cg = cos(eta_alpha_curr); double sg = sin(eta_alpha_curr);
+		    // Fiber reorientation happens via deformation gradient
 		    ar = n[0]*sg + n[1]*cg;
-		    //ar = R.transpose()*ar;
 		    ar = F_tau*ar;
 		    ar = ar/ar.norm();
 
@@ -324,6 +317,7 @@ public:
 	FEParamDouble     m_elastin_injury_val;      //!< K_delta_sigma
 	FEParamDouble     m_crosslinking_injury_val;      //!< K_delta_sigma
 	FEParamDouble     m_mechanosensing_injury_val;      //!< K_delta_sigma
+	FEParamDouble     m_mechanosensitivity_injury_val;      //!< K_delta_sigma
 	FEParamDouble     m_mechanoregulation_injury_val;      //!< K_delta_sigma
 
     DECLARE_FECORE_CLASS();

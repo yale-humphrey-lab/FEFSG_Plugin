@@ -100,7 +100,7 @@ def getRandomInjuryField(T, Z, r):
     slope = 0.6
     L_t = 2.0
     L_z = 1.5
-    #np.random.seed(5)
+    np.random.seed(125)
 
     mu = 1/2 - 1/slope/np.sqrt(np.pi) * np.exp(-erfinv(1 - 2 * overall_perturbed)**2) * erfinv(1 - 2 * overall_perturbed)
     sigma = 1/slope/np.sqrt(2 * np.pi) * np.exp(-erfinv(1 - 2 * overall_perturbed)**2)
@@ -175,15 +175,19 @@ def getGeometry():
     torusFraction = 0.25
     torusRadius = 10.0
     numCirc = 12 # Number of circumfrential elements # Must be divisible by 4
-    numLen = 24 # Number of axial elements
+    numLen = 1 # Number of axial elements
     numRad = 1 # Number of radial elements
-    radius = 6.468e-01
-    thickness = 4.02e-02
-    length = 15.0
+    radius = 6.468e-01 #0.809 #6.468e-01
+    thickness = 4.02e-02 #0.041 #4.02e-02
+    length = 4.02e-02 #0.041 #15.0
+
+
+    # Add aneurysm conditions
+    random_field = False
 
     # Symmetry conditions
     half_circumfrence = False
-    quarter_circumfrence = False
+    quarter_circumfrence = True
     half_length = False
 
     # Element types (default quadratic hexehdron)
@@ -408,7 +412,9 @@ def getGeometry():
 
 
     T, Z = np.meshgrid(np.linspace(0, 2.0*np.pi, maxCirc), np.linspace(-length/2.0, length/2.0, maxLen))
-    M = getRandomInjuryField(T, Z, radius)
+    
+    if random_field:
+        M = getRandomInjuryField(T, Z, radius)
 
     for i in range(0, maxLen, numJump):
         for j in range(0, maxCirc, numJump):
@@ -454,7 +460,9 @@ def getGeometry():
                 xPt = np.cos(theta)
                 yPt = np.sin(theta)
                 zPt = length*(i+numJump/2.)/numLen - length/2.0
-                injury_val.append(M[i,j])
+
+                if random_field:
+                    injury_val.append(M[i,j])
 
 
 

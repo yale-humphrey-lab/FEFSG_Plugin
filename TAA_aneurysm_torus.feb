@@ -3,7 +3,7 @@
   <Module type="solid" />
   <Control>
     <analysis>STATIC</analysis>
-    <time_steps>2</time_steps>
+    <time_steps>1441</time_steps>
     <step_size>1</step_size>
     <solver>
       <diverge_reform>1</diverge_reform>
@@ -33,7 +33,7 @@
     <material id="1" name="Material1" type="FSG">
       <density>1</density>
       <k>1000.0</k>
-      <elastin_injury_val lc="2" type="math"> 0.0 * exp(-abs((atan2(Y,Z) - pi/4.0) / (pi/8.0)) ^ 5.0)</elastin_injury_val>
+      <elastin_injury_val lc="2" type="math"> 0.6 * exp(-abs((atan2(Y,Z) - pi/4.0) / (pi/8.0)) ^ 5.0)</elastin_injury_val>
       <e_r type="math"> sin(atan2(X,(sqrt(Y^2 + Z^2) - 10.0))), cos(atan2(X,(sqrt(Y^2 + Z^2) - 10.0))) * sin(atan2(Y,Z)), cos(atan2(X,(sqrt(Y^2 + Z^2) - 10.0))) * cos(atan2(Y,Z)) </e_r>
       <e_t type="math"> cos(atan2(X,(sqrt(Y^2 + Z^2) - 10.0))), -sin(atan2(X,(sqrt(Y^2 + Z^2) - 10.0))) * sin(atan2(Y,Z)), -sin(atan2(X,(sqrt(Y^2 + Z^2) - 10.0))) * cos(atan2(Y,Z)) </e_t>
       <e_z type="math"> 0, -cos(atan2(Y,Z)), sin(atan2(Y,Z)) </e_z>

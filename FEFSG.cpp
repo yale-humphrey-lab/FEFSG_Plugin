@@ -15,6 +15,7 @@ BEGIN_FECORE_CLASS(FEFSG, FEUncoupledMaterial)
     ADD_PARAMETER(m_elastin_injury_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "elastin_injury_val");
     ADD_PARAMETER(m_crosslinking_injury_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "crosslinking_injury_val");
     ADD_PARAMETER(m_mechanosensing_injury_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "mechanosensing_injury_val");
+    ADD_PARAMETER(m_mechanosensitivity_injury_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "mechanosensitivity_injury_val");
     ADD_PARAMETER(m_mechanoregulation_injury_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "mechanoregulation_injury_val");
     ADD_PARAMETER(e_r , "e_r");
     ADD_PARAMETER(e_t , "e_t");
@@ -30,6 +31,7 @@ FEFSG::FEFSG(FEModel* pfem) : FEUncoupledMaterial(pfem)
     m_elastin_injury_val = 0;
     m_crosslinking_injury_val = 0;
     m_mechanosensing_injury_val = 0;
+    m_mechanosensitivity_injury_val = 0;
     m_mechanoregulation_injury_val = 0;
     e_r = vec3d(1,0,0);
     e_t = vec3d(0,1,0);
@@ -252,7 +254,7 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
     mat3d Q = mat3d(e_r(mp), e_t(mp), e_z(mp));
 
     if (sn > 0){
-        pt.K_delta_sigma = m_mechanosensing_injury_val(mp);
+        pt.K_delta_sigma = m_mechanosensitivity_injury_val(mp);
         pt.m_constituents[0].c1_alpha = pt.m_constituents[0].c1_alpha_h*(1.0 - m_elastin_injury_val(mp));
 
         //Loop through each constituent to update its mass density
