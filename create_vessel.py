@@ -174,12 +174,12 @@ def getGeometry():
     vesselType = "cylinder" # Can be "torus" or "cylinder"
     torusFraction = 0.25
     torusRadius = 10.0
-    numCirc = 12 # Number of circumfrential elements # Must be divisible by 4
-    numLen = 1 # Number of axial elements
+    numCirc = 20 # Number of circumfrential elements # Must be divisible by 4
+    numLen = 20 # Number of axial elements
     numRad = 1 # Number of radial elements
     radius = 6.468e-01 #0.809 #6.468e-01
     thickness = 4.02e-02 #0.041 #4.02e-02
-    length = 4.02e-02 #0.041 #15.0
+    length = 15. #0.041 #15.0
 
 
     # Add aneurysm conditions

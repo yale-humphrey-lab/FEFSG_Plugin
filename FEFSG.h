@@ -18,7 +18,7 @@
 
 class GRConstituent {
 public:
-	enum { MAX_TIMESTEPS = 2881 };
+	enum { MAX_TIMESTEPS = 1441 };
 
     double epsilon_pol_min;
     double eta_alpha_h;
@@ -221,7 +221,7 @@ public:
 	void update_sigma(int sn);
 	void update_kinetics(int sn);
 	
-	enum { MAX_TIMESTEPS = 2881 };
+	enum { MAX_TIMESTEPS = 1441 };
 	enum { MAX_CONSTITUENTS = 6 };
 
 

@@ -198,7 +198,7 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
     const double dt = timeInfo.timeIncrement;
     const int n_iter = timeInfo.currentRestart;
 
-    double omega = double(n_iter)/10.0;
+    double omega = double(n_iter)/20.0;
     if (omega > 1.0) {
         omega = 1.0;
     }
