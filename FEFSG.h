@@ -231,6 +231,8 @@ public:
     double m_dt;
     double K_delta_tauw;
     double K_delta_sigma;
+    double K_p_delta_sigma;
+    double K_d_delta_sigma;
     double sigma_inv_h;
     double sigma_inv_curr;
     double rho_hat_h;
@@ -314,11 +316,12 @@ public:
 	FEParamVec3     e_r;      //
 	FEParamVec3     e_t;      //
 	FEParamVec3     e_z;      //
-	FEParamDouble     m_elastin_injury_val;      //!< K_delta_sigma
-	FEParamDouble     m_crosslinking_injury_val;      //!< K_delta_sigma
-	FEParamDouble     m_mechanosensing_injury_val;      //!< K_delta_sigma
-	FEParamDouble     m_mechanosensitivity_injury_val;      //!< K_delta_sigma
-	FEParamDouble     m_mechanoregulation_injury_val;      //!< K_delta_sigma
+	FEParamDouble     m_elastin_injury_val;
+	FEParamDouble     m_crosslinking_injury_val;
+	FEParamDouble     m_mechanosensing_injury_val;
+	FEParamDouble     m_mechanoregulation_injury_val;
+	FEParamDouble     m_production_mechanosensitivity_injury_val;
+	FEParamDouble     m_degradation_mechanosensitivity_injury_val;
 
     DECLARE_FECORE_CLASS();
 

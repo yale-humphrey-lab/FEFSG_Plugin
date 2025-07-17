@@ -15,7 +15,8 @@ BEGIN_FECORE_CLASS(FEFSG, FEUncoupledMaterial)
     ADD_PARAMETER(m_elastin_injury_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "elastin_injury_val");
     ADD_PARAMETER(m_crosslinking_injury_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "crosslinking_injury_val");
     ADD_PARAMETER(m_mechanosensing_injury_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "mechanosensing_injury_val");
-    ADD_PARAMETER(m_mechanosensitivity_injury_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "mechanosensitivity_injury_val");
+    ADD_PARAMETER(m_production_mechanosensitivity_injury_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "production_mechanosensitivity_injury_val");
+    ADD_PARAMETER(m_degradation_mechanosensitivity_injury_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "degradation_mechanosensitivity_injury_val");
     ADD_PARAMETER(m_mechanoregulation_injury_val      , FE_RANGE_GREATER_OR_EQUAL(0.0), "mechanoregulation_injury_val");
     ADD_PARAMETER(e_r , "e_r");
     ADD_PARAMETER(e_t , "e_t");
@@ -31,8 +32,9 @@ FEFSG::FEFSG(FEModel* pfem) : FEUncoupledMaterial(pfem)
     m_elastin_injury_val = 0;
     m_crosslinking_injury_val = 0;
     m_mechanosensing_injury_val = 0;
-    m_mechanosensitivity_injury_val = 0;
     m_mechanoregulation_injury_val = 0;
+    m_production_mechanosensitivity_injury_val = 0;
+    m_degradation_mechanosensitivity_injury_val = 0;
     e_r = vec3d(1,0,0);
     e_t = vec3d(0,1,0);
     e_z = vec3d(0,0,1);
@@ -198,7 +200,7 @@ void GRMaterialPoint::Update(const FETimeInfo& timeInfo)
     const double dt = timeInfo.timeIncrement;
     const int n_iter = timeInfo.currentRestart;
 
-    double omega = double(n_iter)/20.0;
+    double omega = double(n_iter)/10.0;
     if (omega > 1.0) {
         omega = 1.0;
     }
@@ -254,7 +256,9 @@ void FEFSG::DevStressTangent(FEMaterialPoint& mp, mat3ds& devstress, tens4ds& de
     mat3d Q = mat3d(e_r(mp), e_t(mp), e_z(mp));
 
     if (sn > 0){
-        pt.K_delta_sigma = m_mechanosensitivity_injury_val(mp);
+        pt.K_delta_sigma = m_mechanosensing_injury_val(mp);
+        pt.K_p_delta_sigma = m_production_mechanosensitivity_injury_val(mp);
+        pt.K_d_delta_sigma = m_degradation_mechanosensitivity_injury_val(mp);
         pt.m_constituents[0].c1_alpha = pt.m_constituents[0].c1_alpha_h*(1.0 - m_elastin_injury_val(mp));
 
         //Loop through each constituent to update its mass density
@@ -345,12 +349,12 @@ void GRMaterialPoint::update_kinetics(int sn) {
                 K_tauw_d = m_constituents[alpha].K_tauw_d_alpha_h;
 
                 //Update the stimulus functions for each constituent
-                upsilon_p = 1 + (1 - K_delta_sigma) * K_sigma_p * delta_sigma - K_tauw_p * delta_tauw;
+                upsilon_p = 1 + (1 - K_p_delta_sigma) * K_sigma_p * delta_sigma - K_tauw_p * delta_tauw;
                 //if (upsilon_p < 0.1) {
                 //    upsilon_p = 0.1;
                 //}
 
-                upsilon_d = 1 + K_sigma_d * pow(delta_sigma, 2) + K_tauw_d * pow(delta_tauw, 2);
+                upsilon_d = 1 + (1 - K_d_delta_sigma) * K_sigma_d * pow(delta_sigma, 2) + K_tauw_d * pow(delta_tauw, 2);
 
                 rhoR_alpha_calc = m_constituents[alpha].rhoR_alpha[sn];
 
