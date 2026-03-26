@@ -3,11 +3,6 @@ import pyvista as pv
 import vtk
 import xml.etree.ElementTree as ET
 import argparse
-from scipy.special import erfinv
-from scipy.spatial.distance import cdist, squareform
-from numpy.linalg import pinv
-from scipy.stats import multivariate_normal, norm
-import matplotlib.pyplot as plt
 
 def update_geometry(xml_file_path, xml_items1, xml_items2, xml_items3):
     tree = ET.parse(xml_file_path)
@@ -26,14 +21,6 @@ def update_geometry(xml_file_path, xml_items1, xml_items2, xml_items3):
     boundary_tag.clear()
     for item in xml_items2:
         boundary_tag.append(item)
-
-    # Find the Boundary tag
-    boundary_tag = root.find(".//MeshData")
-    # Remove existing content under Geometry tag
-    boundary_tag.clear()
-    for item in xml_items3:
-        boundary_tag.append(item)
-
 
     ET.indent(tree, '  ')
 
@@ -64,110 +51,6 @@ def save_vtk_mesh(grid, filename):
     writer.SetInputData(grid)
     writer.Write()
 
-
-# Ensure semi-positive definiteness (SPD)
-def nearestSPD(A):
-    """Find the nearest symmetric positive definite matrix."""
-    B = (A + A.T) / 2
-    _, s, V = np.linalg.svd(B)
-    H = np.dot(V.T, np.dot(np.diag(s), V))
-    A2 = (B + H) / 2
-    A3 = (A2 + A2.T) / 2
-    if isSPD(A3):
-        return A3
-    spacing = np.spacing(np.linalg.norm(A))
-    I = np.eye(A.shape[0])
-    k = 1
-    while not isSPD(A3):
-        mineig = np.min(np.real(np.linalg.eigvals(A3)))
-        A3 += I * (-mineig * k**2 + spacing)
-        k += 1
-    return A3
-
-
-def isSPD(A):
-    """Check if a matrix is symmetric positive definite."""
-    try:
-        np.linalg.cholesky(A)
-        return True
-    except np.linalg.LinAlgError:
-        return False
-
-
-def getRandomInjuryField(T, Z, r):
-
-    overall_perturbed = 0.15
-    slope = 0.6
-    L_t = 2.0
-    L_z = 1.5
-    np.random.seed(125)
-
-    mu = 1/2 - 1/slope/np.sqrt(np.pi) * np.exp(-erfinv(1 - 2 * overall_perturbed)**2) * erfinv(1 - 2 * overall_perturbed)
-    sigma = 1/slope/np.sqrt(2 * np.pi) * np.exp(-erfinv(1 - 2 * overall_perturbed)**2)
-
-    # Pairwise distances in theta [mm], taking into account the vessel circumference
-    D_t = cdist(T.flatten()[:, np.newaxis] + np.pi,T.flatten()[:, np.newaxis] + np.pi)*r
-    # To enforce periodicity in the covariance function (using the periodic kernel)
-    D_t = 2 * np.sin(np.pi * D_t / (2 * np.pi * r))
-    # Pairwise distances in z [mm]
-    D_z = cdist(Z.flatten()[:, np.newaxis],Z.flatten()[:, np.newaxis])
-
-    # Overall standardized squared distance metric
-    D_squared = (D_t * r / L_t) ** 2 + (D_z / L_z) ** 2
-
-    # Covariance matrix of mechanosensing (M*) values at all surface points
-    SIGMA = sigma**2 * np.exp(-0.5 * D_squared)
-
-    # Correlation matrix
-    diag_SIGMA = np.sqrt(np.diag(SIGMA))
-    CORR = SIGMA / np.outer(diag_SIGMA, diag_SIGMA)
-
-    # Number of standard deviations away to place M* at the boundaries
-    n_std = 2
-
-    # Non-boundary indices
-    idx1 = np.where(~((Z.flatten() == np.min(Z)) | (Z.flatten() == np.max(Z))))[0]
-
-    # Boundary indices
-    idx2 = np.where((Z.flatten() == np.min(Z)) | (Z.flatten() == np.max(Z)))[0]
-
-    # Matrix of "regression coefficients"
-    regmat = SIGMA[np.ix_(idx1, idx2)] @ pinv(SIGMA[np.ix_(idx2, idx2)])
-
-    # Conditional mean
-    MU_cond = np.full(T.size, np.nan)  # Initialize with NaN values
-    MU_cond[idx2] = mu - n_std * sigma
-    MU_cond[idx1] = mu + regmat @ (mu - n_std * sigma - mu * np.ones(len(idx2)))
-    MU_cond = MU_cond.T  # Ensure it's a row vector
-
-    # Conditional covariance matrix
-    SIGMA_cond = np.zeros_like(SIGMA)
-    SIGMA_cond[np.ix_(idx1, idx1)] = SIGMA[np.ix_(idx1, idx1)] - regmat @ SIGMA[np.ix_(idx2, idx1)]
-
-    # Apply nearestSPD to ensure positive semi-definiteness
-    SIGMA_cond_SPD = nearestSPD(SIGMA_cond)
-
-    # Generate random field (latent Gaussian process)
-    M_star = multivariate_normal.rvs(mean=MU_cond, cov=SIGMA_cond_SPD).reshape(T.shape)
-
-    # Transform to match Normal(mu, sigma) exactly using inverse CDF (norminv equivalent)
-    # In Python, we use np.histogram for ksdensity approximation and norm.ppf for inverse CDF
-    sorted_M_star = np.sort(M_star.flatten())
-    
-    # Approximate CDF using empirical distribution (like ksdensity)
-    cdf_vals = np.linspace(0, 1, len(sorted_M_star), endpoint=False)
-
-    # Apply the inverse CDF (percent-point function)
-    M_star_transformed = norm.ppf(cdf_vals, loc=mu, scale=sigma)
-    
-    # Reshape to the original size
-    M_star = np.interp(M_star.flatten(), sorted_M_star, M_star_transformed).reshape(M_star.shape)
-
-    # Mechanosensing field in [0, 1]
-    M = np.clip(M_star, 0, 1)
-
-    return M
-
 def getGeometry():
     print("Initializing cylindrical vessel...")
 
@@ -175,19 +58,15 @@ def getGeometry():
     torusFraction = 0.25
     torusRadius = 10.0
     numCirc = 20 # Number of circumfrential elements # Must be divisible by 4
-    numLen = 20 # Number of axial elements
+    numLen = 1 # Number of axial elements
     numRad = 1 # Number of radial elements
     radius = 6.468e-01 #0.809 #6.468e-01
     thickness = 4.02e-02 #0.041 #4.02e-02
-    length = 15. #0.041 #15.0
-
-
-    # Add aneurysm conditions
-    random_field = False
+    length = 4.02e-02 #0.041 #15.0
 
     # Symmetry conditions
     half_circumfrence = False
-    quarter_circumfrence = True
+    quarter_circumfrence = False
     half_length = False
 
     # Element types (default quadratic hexehdron)
@@ -412,9 +291,6 @@ def getGeometry():
 
 
     T, Z = np.meshgrid(np.linspace(0, 2.0*np.pi, maxCirc), np.linspace(-length/2.0, length/2.0, maxLen))
-    
-    if random_field:
-        M = getRandomInjuryField(T, Z, radius)
 
     for i in range(0, maxLen, numJump):
         for j in range(0, maxCirc, numJump):
@@ -460,10 +336,6 @@ def getGeometry():
                 xPt = np.cos(theta)
                 yPt = np.sin(theta)
                 zPt = length*(i+numJump/2.)/numLen - length/2.0
-
-                if random_field:
-                    injury_val.append(M[i,j])
-
 
 
     xml_content1 = []
