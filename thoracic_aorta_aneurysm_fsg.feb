@@ -33,7 +33,7 @@
     <material id="1" name="Material1" type="FSG">
       <density>1</density>
       <k>2000.0</k>
-      <elastin_injury_val lc="2" type="math"> 0.62 * exp(-abs((Z - 0.0) / 3.0) ^ 5.0)</elastin_injury_val>
+      <elastin_injury_val lc="2" type="math"> 0.36 * exp(-abs((Z - 0.0) / 3.0) ^ 5.0)</elastin_injury_val>
       <production_mechanosensitivity_injury_val lc="2" type="math"> 0.0 * exp(-abs((Z - 0.0) / 3.0) ^ 5.0)</production_mechanosensitivity_injury_val>
       <degradation_mechanosensitivity_injury_val lc="2" type="math"> 0.0 * exp(-abs((Z - 0.0) / 3.0) ^ 5.0)</degradation_mechanosensitivity_injury_val>
       <e_r type="math"> X/sqrt(X^2 + Y^2), Y/sqrt(X^2 + Y^2), 0 </e_r>

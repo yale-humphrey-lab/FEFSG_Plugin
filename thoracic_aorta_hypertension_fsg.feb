@@ -3,7 +3,7 @@
   <Module type="solid" />
   <Control>
     <analysis>STATIC</analysis>
-    <time_steps>5760</time_steps>
+    <time_steps>1441</time_steps>
     <step_size>1</step_size>
     <solver>
       <diverge_reform>1</diverge_reform>
