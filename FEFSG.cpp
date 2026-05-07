@@ -104,11 +104,27 @@ void GRMaterialPoint::Init()
     rho[0] = rho_hat_h;
 
     // Determine the number of lines in the file (excluding the first line)
-    m_nconstituents = std::count(std::istreambuf_iterator<char>(inputFile), std::istreambuf_iterator<char>(), '\n');
-    if (m_nconstituents > MAX_CONSTITUENTS) {
-        std::cerr << "Too many constituents for simulation. Edit plugin if you want more." << filename << std::endl;
-        return;
+    std::string line;
+	m_nconstituents = 0;
+
+while (std::getline(inputFile, line)) {
+    // Check if line contains anything besides whitespace
+    bool hasContent = std::any_of(line.begin(), line.end(),
+        [](unsigned char c) {
+            return !std::isspace(c);
+        });
+
+    if (hasContent) {
+        ++m_nconstituents;
     }
+}
+
+if (m_nconstituents > MAX_CONSTITUENTS) {
+    std::cerr << "Too many constituents for simulation. Edit plugin if you want more. "
+              << filename << std::endl;
+    return;
+}
+
 
     // Move the file pointer back to the beginning
     inputFile.clear();
